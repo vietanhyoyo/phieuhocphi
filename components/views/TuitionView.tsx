@@ -1,0 +1,15 @@
+"use client";
+
+import { ChevronRight, CircleDollarSign, ReceiptText, WalletCards } from "lucide-react";
+import { VietnameseMonthPicker } from "@/components/shared/VietnameseMonthPicker";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { AppData } from "@/lib/types";
+import { formatCurrency, getMonthlySummary, minutesLabel, monthLabel } from "@/lib/utils";
+
+export function TuitionView({ data, month, setMonth, onReceipt, onStudent }: { data: AppData; month: string; setMonth: (value: string) => void; onReceipt: (studentId: string) => void; onStudent: (studentId: string) => void }) {
+  const summaries = getMonthlySummary(data, month);
+  const total = summaries.reduce((sum, summary) => sum + summary.totalFee, 0);
+  return <div className="view-stack"><div className="page-heading"><div><span className="section-kicker">TỔNG HỢP</span><h2>Học phí</h2><p>Nhìn lại một tháng dạy học</p></div><span className="heading-icon amber-tint"><WalletCards size={21} /></span></div><Card className="month-banner"><div><span>ĐANG XEM</span><strong>{monthLabel(month)}</strong></div><div className="month-control light"><VietnameseMonthPicker value={month} onChange={setMonth} compact /></div></Card><Card className="tuition-total"><div><span>Tổng học phí tháng</span><strong>{formatCurrency(total).replace(" ₫", "đ")}</strong></div><span className="tuition-total-icon"><CircleDollarSign size={24} /></span></Card><div className="section-heading tuition-heading"><div><span className="section-kicker">THEO HỌC SINH</span><h3>{summaries.length} phiếu cần xem</h3></div></div>{summaries.length ? <div className="tuition-list">{summaries.map((summary) => { const student = data.students.find((item) => item.id === summary.studentId); return <Card className="tuition-card" key={summary.studentId}><button className="tuition-card-top" onClick={() => onStudent(summary.studentId)}><span className="avatar">{student?.name.charAt(0) ?? "?"}</span><div><strong>{student?.name ?? "Học sinh đã lưu"}</strong><span>{summary.totalLessonCount} buổi · {minutesLabel(summary.totalDurationMinutes)}</span></div><ChevronRight size={18} /></button><div className="mini-breakdown">{summary.subjects.map((subject) => <div key={subject.subjectId}><span>{subject.subjectName} <Badge variant="secondary" className="ml-1 border-0 px-1.5 py-0 text-[9px]">× {subject.lessonCount}</Badge></span><strong>{formatCurrency(subject.totalFee).replace(" ₫", "đ")}</strong></div>)}</div><div className="tuition-card-bottom"><div><span>Tổng cộng</span><strong>{formatCurrency(summary.totalFee).replace(" ₫", "đ")}</strong></div><Button size="sm" className="rounded-xl" onClick={() => onReceipt(summary.studentId)}><ReceiptText className="h-4 w-4" /> Tạo phiếu</Button></div></Card>; })}</div> : <div className="empty-card"><div className="empty-illustration"><WalletCards size={27} /></div><h4>Chưa có học phí tháng này</h4><p>Khi có buổi dạy được ghi nhận, bảng tổng hợp sẽ tự động xuất hiện.</p></div>}</div>;
+}
