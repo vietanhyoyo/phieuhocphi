@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppData, Lesson, Notice, NoticeType, Student, StudentDraft, StudentSubject, Subject } from "@/lib/types";
 import { createInitialData, isValidAppData, loadData, saveData } from "@/lib/storage";
+import { loadRemoteData, saveRemoteData } from "@/lib/cloud-storage";
 import { currentDate, currentMonth, emptyStudentDraft, uid } from "@/lib/utils";
 
 export type AppStore = ReturnType<typeof useAppStore>;
 
-export function useAppStore() {
+export function useAppStore(accountId: string | null) {
   const [data, setData] = useState<AppData>(createInitialData);
   const [hydrated, setHydrated] = useState(false);
   const [view, setView] = useState<"home" | "lessons" | "students" | "tuition" | "settings">("home");
@@ -19,15 +20,36 @@ export function useAppStore() {
   const [subjectModal, setSubjectModal] = useState<Subject | "new" | null>(null);
   const [receiptTarget, setReceiptTarget] = useState<{ studentId: string; month: string } | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const [storageStatus, setStorageStatus] = useState<"checking" | "local" | "cloud" | "syncing" | "error">("checking");
   const [confirmDelete, setConfirmDelete] = useState<Lesson | null>(null);
   const [studentDraft, setStudentDraft] = useState<StudentDraft>(emptyStudentDraft());
   const [subjectName, setSubjectName] = useState("");
   const restoreRef = useRef<HTMLInputElement>(null);
+  const cloudEnabledRef = useRef(false);
+  const latestDataRef = useRef<AppData>(createInitialData());
+  const saveQueueRef = useRef(Promise.resolve());
+  const syncErrorShownRef = useRef(false);
+
+  const storageScope = accountId ?? "guest";
 
   useEffect(() => {
-    setData(loadData());
+    if (!accountId) {
+      cloudEnabledRef.current = false;
+      setHydrated(false);
+      setStorageStatus("checking");
+      return;
+    }
+
+    cloudEnabledRef.current = false;
+    const localData = loadData(storageScope);
+    latestDataRef.current = localData;
+    setData(localData);
+    setStorageStatus("local");
     setHydrated(true);
-  }, []);
+    syncErrorShownRef.current = false;
+    saveQueueRef.current = Promise.resolve();
+    void refreshRemoteData(localData);
+  }, [accountId]);
 
   useEffect(() => {
     if (!notice) return;
@@ -35,9 +57,59 @@ export function useAppStore() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  const queueRemoteSave = (next: AppData, ownerId: string | null = accountId) => {
+    if (!ownerId || !cloudEnabledRef.current) return;
+    saveQueueRef.current = saveQueueRef.current
+      .then(async () => {
+        if (ownerId !== accountId) return;
+        setStorageStatus("syncing");
+        await saveRemoteData(next);
+        if (ownerId !== accountId) return;
+        setStorageStatus("cloud");
+        syncErrorShownRef.current = false;
+      })
+      .catch(() => {
+        if (ownerId !== accountId) return;
+        setStorageStatus("error");
+        if (!syncErrorShownRef.current) {
+          syncErrorShownRef.current = true;
+          setNotice({ message: "Đã lưu tạm trên thiết bị nhưng chưa đồng bộ được với Google Sheet.", type: "error" });
+        }
+      });
+  };
+
+  const refreshRemoteData = async (fallbackData = latestDataRef.current, ownerId: string | null = accountId) => {
+    if (!ownerId) return;
+    try {
+      const remote = await loadRemoteData();
+      if (ownerId !== accountId) return;
+      if (!remote.configured) {
+        cloudEnabledRef.current = false;
+        setStorageStatus("local");
+        return;
+      }
+      cloudEnabledRef.current = true;
+      if (remote.data) {
+        latestDataRef.current = remote.data;
+        setData(remote.data);
+        saveData(remote.data, storageScope);
+      } else {
+        await saveRemoteData(fallbackData);
+        if (ownerId !== accountId) return;
+      }
+      setStorageStatus("cloud");
+    } catch {
+      if (ownerId !== accountId) return;
+      cloudEnabledRef.current = false;
+      setStorageStatus("error");
+    }
+  };
+
   const updateData = (next: AppData) => {
+    latestDataRef.current = next;
     setData(next);
-    saveData(next);
+    saveData(next, storageScope);
+    queueRemoteSave(next, accountId);
   };
 
   const notify = (message: string, type: NoticeType = "success") => setNotice({ message, type });
@@ -182,6 +254,7 @@ export function useAppStore() {
     subjectModal, setSubjectModal, subjectName, setSubjectName,
     receiptTarget, setReceiptTarget, notice, confirmDelete, setConfirmDelete,
     restoreRef, todayLessons,
+    storageStatus, refreshRemoteData,
     openStudent, saveStudent, toggleStudentActive,
     openSubject, saveSubject, toggleSubject,
     saveLesson, removeLesson, openRestore, notify,

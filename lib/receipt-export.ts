@@ -52,7 +52,7 @@ export function exportReceiptToPng(input: ReceiptExportInput, fileName: string):
       if (dateRowWidth && dateRowWidth + badgeWidth > logicalWidth - 156) { dateRows += 1; dateRowWidth = 0; }
       dateRowWidth += badgeWidth + 8;
     });
-    const logicalHeight = 930 + input.subjects.length * subjectHeight + Math.max(0, dateRows - 1) * 30;
+    const logicalHeight = 1005 + input.subjects.length * subjectHeight + Math.max(0, dateRows - 1) * 30;
     const canvas = document.createElement("canvas");
     canvas.width = logicalWidth * scale;
     canvas.height = logicalHeight * scale;
@@ -158,12 +158,17 @@ export function exportReceiptToPng(input: ReceiptExportInput, fileName: string):
     noteLines.forEach((line, index) => drawText(ctx, line, 78, noteTop + 45 + index * 20, "400 14px Arial", "#5d5b50"));
 
     const qrTop = noteTop + 120;
-    drawText(ctx, "MÃ QR PHIẾU HỌC PHÍ", logicalWidth / 2, qrTop, "800 13px Arial", "#7c9ba5", "center");
+    drawText(ctx, "MÃ THANH TOÁN", logicalWidth / 2, qrTop, "800 13px Arial", "#7c9ba5", "center");
+    ctx.fillStyle = "#fcfffe";
+    roundedRect(ctx, logicalWidth / 2 - 180, qrTop + 14, 360, 170, 14);
     ctx.strokeStyle = "#71bfae";
     ctx.setLineDash([5, 5]);
-    ctx.strokeRect(logicalWidth / 2 - 75, qrTop + 14, 150, 150);
+    ctx.strokeRect(logicalWidth / 2 - 180, qrTop + 14, 360, 170);
     ctx.setLineDash([]);
-    drawText(ctx, "Quét để xem thông tin phiếu", logicalWidth / 2, qrTop + 180, "400 11px Arial", "#92a5ab", "center");
+    drawText(ctx, "TECHCOMBANK", logicalWidth / 2 - 12, qrTop + 56, "800 15px Arial", "#e11d2e");
+    drawText(ctx, "DANH MINH HIEU", logicalWidth / 2 - 12, qrTop + 82, "800 14px Arial", "#466778");
+    drawText(ctx, "8804 0402 02", logicalWidth / 2 - 12, qrTop + 112, "800 20px Arial", "#176d89");
+    drawText(ctx, "Quét mã để chuyển khoản", logicalWidth / 2 - 12, qrTop + 141, "400 11px Arial", "#92a5ab");
     drawText(ctx, "Cảm ơn bạn đã đồng hành cùng lớp học ✦", logicalWidth / 2, logicalHeight - 42, "italic 15px Arial", "#6995a2", "center");
     drawText(ctx, "Được tạo từ Sổ học phí", logicalWidth / 2, logicalHeight - 18, "400 12px Arial", "#b0bdc1", "center");
 
@@ -182,7 +187,7 @@ export function exportReceiptToPng(input: ReceiptExportInput, fileName: string):
     }, "image/png");
     if (input.qrCodeDataUrl) {
       const qrImage = new Image();
-      qrImage.onload = () => { ctx.drawImage(qrImage, logicalWidth / 2 - 65, qrTop + 25, 130, 130); finish(); };
+      qrImage.onload = () => { ctx.drawImage(qrImage, logicalWidth / 2 - 163, qrTop + 26, 120, 135); finish(); };
       qrImage.onerror = finish;
       qrImage.src = input.qrCodeDataUrl;
     } else finish();

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -16,13 +17,37 @@ import { SubjectModal } from "@/components/modals/SubjectModal";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { exportBackup } from "@/lib/storage";
 import { useAppStore } from "@/hooks/useAppStore";
+import { AuthView } from "@/components/views/AuthView";
+import { AuthUser } from "@/lib/types";
 
 export default function Page() {
-  const app = useAppStore();
+  const [auth, setAuth] = useState<{ loading: boolean; configured: boolean; authenticated: boolean; hasUsers: boolean; user: AuthUser | null; error?: string }>({ loading: true, configured: false, authenticated: true, hasUsers: false, user: null });
+  const storageScope = auth.configured ? (auth.authenticated && auth.user ? auth.user.id : null) : "local";
+  const app = useAppStore(storageScope);
 
-  if (!app.hydrated) {
+  useEffect(() => {
+    fetch("/api/auth", { cache: "no-store" })
+      .then(async (response) => ({ response, body: await response.json().catch(() => ({})) as { configured?: boolean; authenticated?: boolean; hasUsers?: boolean; user?: AuthUser | null; message?: string } }))
+      .then(({ body }) => setAuth({ loading: false, configured: Boolean(body.configured), authenticated: Boolean(body.authenticated), hasUsers: Boolean(body.hasUsers), user: body.user ?? null, error: body.message }))
+      .catch(() => setAuth({ loading: false, configured: false, authenticated: true, hasUsers: false, user: null }));
+  }, []);
+
+  const handleAuthenticated = async (user: AuthUser) => {
+    setAuth((current) => ({ ...current, authenticated: true, user }));
+  };
+
+  const logout = async () => {
+    await fetch("/api/auth", { method: "DELETE" });
+    setAuth((current) => ({ ...current, authenticated: false, user: null }));
+  };
+
+  if (auth.loading) {
     return <main className="loading-screen"><div className="loading-mark brand-image"><img src="/app-logo.png" alt="Logo Sổ học phí" /></div><span>Đang mở sổ học phí…</span></main>;
   }
+
+  if (auth.error && auth.configured) return <main className="loading-screen"><span>{auth.error}</span></main>;
+  if (auth.configured && !auth.authenticated) return <AuthView hasUsers={auth.hasUsers} onAuthenticated={handleAuthenticated} />;
+  if (!app.hydrated) return <main className="loading-screen"><div className="loading-mark brand-image"><img src="/app-logo.png" alt="Logo Sổ học phí" /></div><span>Đang tải dữ liệu riêng của bạn…</span></main>;
 
   const selectedStudent = app.selectedStudentId ? app.data.students.find((student) => student.id === app.selectedStudentId) : null;
 
@@ -32,13 +57,13 @@ export default function Page() {
         <Header view={app.view} onSettings={() => app.setView("settings")} onBack={() => { app.setView("home"); app.setSelectedStudentId(null); }} />
         <div className="app-content">
           {app.view === "home" && <HomeView data={app.data} month={app.month} setMonth={app.setMonth} onRecord={() => app.setLessonModal("new")} onStudent={(id) => { app.setSelectedStudentId(id); app.setView("students"); }} onViewLessons={() => app.setView("lessons")} />}
-          {app.view === "lessons" && <LessonsView data={app.data} month={app.month} setMonth={app.setMonth} search={app.search} setSearch={app.setSearch} onEdit={(lesson) => app.setLessonModal(lesson)} onDelete={app.setConfirmDelete} />}
+          {app.view === "lessons" && <LessonsView data={app.data} month={app.month} setMonth={app.setMonth} search={app.search} setSearch={app.setSearch} onRecord={() => app.setLessonModal("new")} onEdit={(lesson) => app.setLessonModal(lesson)} onDelete={app.setConfirmDelete} />}
           {app.view === "students" && (
             selectedStudent ? <StudentDetail data={app.data} student={selectedStudent} month={app.month} setMonth={app.setMonth} onBack={() => app.setSelectedStudentId(null)} onEdit={() => app.openStudent(selectedStudent)} onRecord={() => app.setLessonModal("new")} onToggleActive={() => app.toggleStudentActive(selectedStudent)} onReceipt={() => app.setReceiptTarget({ studentId: selectedStudent.id, month: app.month })} /> :
               <StudentsView data={app.data} search={app.search} setSearch={app.setSearch} onAdd={() => app.openStudent("new")} onEdit={app.openStudent} onSelect={(id) => app.setSelectedStudentId(id)} />
           )}
           {app.view === "tuition" && <TuitionView data={app.data} month={app.month} setMonth={app.setMonth} onReceipt={(studentId) => app.setReceiptTarget({ studentId, month: app.month })} onStudent={(id) => { app.setSelectedStudentId(id); app.setView("students"); }} />}
-          {app.view === "settings" && <SettingsView data={app.data} onBack={() => app.setView("home")} onAddSubject={() => app.openSubject("new")} onEditSubject={app.openSubject} onToggleSubject={app.toggleSubject} onBackup={() => exportBackup(app.data)} onRestore={() => app.restoreRef.current?.click()} />}
+          {app.view === "settings" && <SettingsView data={app.data} storageStatus={app.storageStatus} currentUser={auth.user} onLogout={logout} onBack={() => app.setView("home")} onAddSubject={() => app.openSubject("new")} onEditSubject={app.openSubject} onToggleSubject={app.toggleSubject} onBackup={() => exportBackup(app.data)} onRestore={() => app.restoreRef.current?.click()} />}
         </div>
         {app.view !== "settings" && <BottomNav view={app.view} onChange={(next) => { app.setView(next); app.setSelectedStudentId(null); app.setSearch(""); }} />}
       </div>

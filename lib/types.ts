@@ -1,6 +1,7 @@
 export type View = "home" | "lessons" | "students" | "tuition" | "settings";
 export type NoticeType = "success" | "error";
 export type Notice = { type: NoticeType; message: string } | null;
+export type AuthUser = { id: string; username: string };
 export type StudentDraft = {
   name: string;
   phone: string;

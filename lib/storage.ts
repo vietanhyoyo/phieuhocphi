@@ -3,6 +3,10 @@ import { AppData } from "./types";
 export const STORAGE_KEY = "tutor-manager:data";
 export const DATA_VERSION = 1;
 
+function scopedStorageKey(scope: string) {
+  return `${STORAGE_KEY}:${scope}`;
+}
+
 const now = () => new Date().toISOString();
 
 export function createInitialData(): AppData {
@@ -24,10 +28,19 @@ export function createInitialData(): AppData {
   };
 }
 
-export function loadData(): AppData {
+export function loadData(scope = "local"): AppData {
   if (typeof window === "undefined") return createInitialData();
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const key = scopedStorageKey(scope);
+    let raw = window.localStorage.getItem(key);
+
+    // Migrate the pre-account local cache to the first account only. Once it
+    // is copied, remove the legacy key so a second account cannot see it.
+    if (!raw) {
+      raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) window.localStorage.setItem(key, raw);
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
     if (!raw) return createInitialData();
     const parsed = JSON.parse(raw) as AppData;
     if (!isValidAppData(parsed)) return createInitialData();
@@ -37,9 +50,10 @@ export function loadData(): AppData {
   }
 }
 
-export function saveData(data: AppData) {
+export function saveData(data: AppData, scope = "local") {
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    window.localStorage.setItem(scopedStorageKey(scope), JSON.stringify(data));
+    window.localStorage.removeItem(STORAGE_KEY);
   }
 }
 
