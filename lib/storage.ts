@@ -9,6 +9,51 @@ function scopedStorageKey(scope: string) {
 
 const now = () => new Date().toISOString();
 
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function localDateValue(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function normalizeDateValue(value: unknown) {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return localDateValue(value);
+  const text = String(value ?? "").trim();
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
+  if (match) return `${match[1]}-${pad(Number(match[2]))}-${pad(Number(match[3]))}`;
+  const parsed = new Date(text);
+  return Number.isFinite(parsed.getTime()) ? localDateValue(parsed) : "";
+}
+
+export function normalizeTimeValue(value: unknown) {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
+  const text = String(value ?? "").trim();
+  const match = /(?:T|\s)(\d{1,2}):(\d{2})(?::\d{2})?/.exec(text) || /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(text);
+  if (match) return `${pad(Number(match[1]))}:${match[2]}`;
+  const parsed = new Date(text);
+  return Number.isFinite(parsed.getTime()) ? `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}` : "";
+}
+
+function normalizeNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeBoolean(value: unknown) {
+  return value === true || value === 1 || String(value).toLowerCase() === "true";
+}
+
+export function normalizeAppData(data: AppData): AppData {
+  return {
+    ...data,
+    subjects: data.subjects.map((subject) => ({ ...subject, active: normalizeBoolean(subject.active) })),
+    students: data.students.map((student) => ({ ...student, active: normalizeBoolean(student.active) })),
+    studentSubjects: data.studentSubjects.map((item) => ({ ...item, defaultFee: normalizeNumber(item.defaultFee), defaultDurationMinutes: normalizeNumber(item.defaultDurationMinutes), active: normalizeBoolean(item.active) })),
+    lessons: data.lessons.map((lesson) => ({ ...lesson, lessonDate: normalizeDateValue(lesson.lessonDate), startTime: normalizeTimeValue(lesson.startTime), durationMinutes: normalizeNumber(lesson.durationMinutes), fee: normalizeNumber(lesson.fee) })),
+  };
+}
+
 export function createInitialData(): AppData {
   const timestamp = now();
   return {
@@ -44,7 +89,7 @@ export function loadData(scope = "local"): AppData {
     if (!raw) return createInitialData();
     const parsed = JSON.parse(raw) as AppData;
     if (!isValidAppData(parsed)) return createInitialData();
-    return parsed;
+    return normalizeAppData(parsed);
   } catch {
     return createInitialData();
   }

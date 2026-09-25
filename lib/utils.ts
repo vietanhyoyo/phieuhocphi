@@ -6,11 +6,12 @@ export function uid(prefix = "id") {
 }
 
 export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(value);
+  const safeValue = Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(safeValue);
 }
 
 export function formatNumber(value: number) {
-  return new Intl.NumberFormat("vi-VN").format(value);
+  return new Intl.NumberFormat("vi-VN").format(Number.isFinite(value) ? value : 0);
 }
 
 export function formatDate(date: string, options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit" }) {
@@ -43,9 +44,10 @@ export function monthLabel(month: string) {
 }
 
 export function minutesLabel(minutes: number) {
-  if (minutes < 60) return `${minutes} phút`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
+  const safeMinutes = Number.isFinite(minutes) ? Math.max(0, minutes) : 0;
+  if (safeMinutes < 60) return `${safeMinutes} phút`;
+  const hours = Math.floor(safeMinutes / 60);
+  const rest = safeMinutes % 60;
   return rest ? `${hours} giờ ${rest} phút` : `${hours} giờ`;
 }
 

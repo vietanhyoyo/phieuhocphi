@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check, LoaderCircle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { HomeView } from "@/components/views/HomeView";
@@ -68,6 +68,8 @@ export default function Page() {
         {app.view !== "settings" && <BottomNav view={app.view} onChange={(next) => { app.setView(next); app.setSelectedStudentId(null); app.setSearch(""); }} />}
       </div>
       <input ref={app.restoreRef} className="hidden" type="file" accept="application/json,.json" onChange={app.openRestore} />
+
+      {(app.storageStatus === "checking" || app.storageStatus === "syncing") && <div className="sheet-loading-indicator" role="status" aria-live="polite"><LoaderCircle size={15} className="sheet-loading-spinner" /><span>{app.storageStatus === "checking" ? "Đang tải dữ liệu…" : "Đang lưu vào Google Sheet…"}</span></div>}
 
       {app.lessonModal && <LessonModal data={app.data} initial={app.lessonModal === "new" ? null : app.lessonModal} onClose={() => app.setLessonModal(null)} onSave={app.saveLesson} />}
       {app.studentModal && <StudentModal data={app.data} draft={app.studentDraft} setDraft={app.setStudentDraft} initial={app.studentModal === "new" ? null : app.studentModal} onClose={() => app.setStudentModal(null)} onSave={app.saveStudent} />}

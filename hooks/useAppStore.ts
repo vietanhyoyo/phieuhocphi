@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppData, Lesson, Notice, NoticeType, Student, StudentDraft, StudentSubject, Subject } from "@/lib/types";
-import { createInitialData, isValidAppData, loadData, saveData } from "@/lib/storage";
+import { createInitialData, isValidAppData, loadData, normalizeAppData, saveData } from "@/lib/storage";
 import { loadRemoteData, saveRemoteData } from "@/lib/cloud-storage";
 import { currentDate, currentMonth, emptyStudentDraft, uid } from "@/lib/utils";
 
@@ -44,7 +44,7 @@ export function useAppStore(accountId: string | null) {
     const localData = loadData(storageScope);
     latestDataRef.current = localData;
     setData(localData);
-    setStorageStatus("local");
+    setStorageStatus("checking");
     setHydrated(true);
     syncErrorShownRef.current = false;
     saveQueueRef.current = Promise.resolve();
@@ -80,6 +80,7 @@ export function useAppStore(accountId: string | null) {
 
   const refreshRemoteData = async (fallbackData = latestDataRef.current, ownerId: string | null = accountId) => {
     if (!ownerId) return;
+    setStorageStatus("checking");
     try {
       const remote = await loadRemoteData();
       if (ownerId !== accountId) return;
@@ -106,10 +107,11 @@ export function useAppStore(accountId: string | null) {
   };
 
   const updateData = (next: AppData) => {
-    latestDataRef.current = next;
-    setData(next);
-    saveData(next, storageScope);
-    queueRemoteSave(next, accountId);
+    const normalized = normalizeAppData(next);
+    latestDataRef.current = normalized;
+    setData(normalized);
+    saveData(normalized, storageScope);
+    queueRemoteSave(normalized, accountId);
   };
 
   const notify = (message: string, type: NoticeType = "success") => setNotice({ message, type });

@@ -1,5 +1,5 @@
 import { AppData } from "@/lib/types";
-import { isValidAppData } from "@/lib/storage";
+import { isValidAppData, normalizeAppData } from "@/lib/storage";
 
 type RemoteLoadResult = {
   configured: boolean;
@@ -16,14 +16,14 @@ export async function loadRemoteData(): Promise<RemoteLoadResult> {
   const response = await fetch("/api/sheets", { cache: "no-store" });
   const body = (await parseResponse(response)) as { configured?: boolean; data?: AppData | null };
   if (body.data !== null && body.data !== undefined && !isValidAppData(body.data)) throw new Error("Dữ liệu nhận từ Google Sheet không hợp lệ.");
-  return { configured: Boolean(body.configured), data: body.data ?? null };
+  return { configured: Boolean(body.configured), data: body.data ? normalizeAppData(body.data) : null };
 }
 
 export async function saveRemoteData(data: AppData) {
   const response = await fetch("/api/sheets", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: normalizeAppData(data) }),
   });
   await parseResponse(response);
 }

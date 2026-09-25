@@ -169,8 +169,10 @@ function readTable_(table) {
   return values.slice(1).filter((row) => row.some((value) => value !== "" && value !== null)).map((row) => {
     const item = {};
     table.headers.forEach((header, index) => { item[header] = row[index]; });
-    ["active"].forEach((key) => { if (key in item) item[key] = item[key] === true || item[key] === "true"; });
-    ["defaultFee", "defaultDurationMinutes", "durationMinutes", "fee"].forEach((key) => { if (key in item) item[key] = Number(item[key] || 0); });
+    ["active"].forEach((key) => { if (key in item) item[key] = item[key] === true || String(item[key]).toLowerCase() === "true"; });
+    ["defaultFee", "defaultDurationMinutes", "durationMinutes", "fee"].forEach((key) => { if (key in item) item[key] = finiteNumber_(item[key]); });
+    if ("lessonDate" in item) item.lessonDate = normalizeDateCell_(item.lessonDate);
+    if ("startTime" in item) item.startTime = normalizeTimeCell_(item.startTime);
     return item;
   });
 }
@@ -181,6 +183,37 @@ function writeTable_(table, records) {
   const rows = [table.headers].concat((records || []).map((record) => table.headers.map((header) => record[header] === undefined ? "" : record[header])));
   sheet.getRange(1, 1, rows.length, table.headers.length).setValues(rows);
   sheet.setFrozenRows(1);
+}
+
+function spreadsheetTimeZone_() {
+  return spreadsheet_().getSpreadsheetTimeZone() || Session.getScriptTimeZone() || "Asia/Ho_Chi_Minh";
+}
+
+function pad2_(value) {
+  return ("0" + Number(value)).slice(-2);
+}
+
+function normalizeDateCell_(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) return Utilities.formatDate(value, spreadsheetTimeZone_(), "yyyy-MM-dd");
+  const text = String(value || "").trim();
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
+  if (match) return match[1] + "-" + pad2_(match[2]) + "-" + pad2_(match[3]);
+  const parsed = new Date(text);
+  return isNaN(parsed.getTime()) ? text : Utilities.formatDate(parsed, spreadsheetTimeZone_(), "yyyy-MM-dd");
+}
+
+function normalizeTimeCell_(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) return Utilities.formatDate(value, spreadsheetTimeZone_(), "HH:mm");
+  const text = String(value || "").trim();
+  const match = /(?:T|\s)(\d{1,2}):(\d{2})(?::\d{2})?/.exec(text) || /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(text);
+  if (match) return pad2_(match[1]) + ":" + match[2];
+  const parsed = new Date(text);
+  return isNaN(parsed.getTime()) ? text : Utilities.formatDate(parsed, spreadsheetTimeZone_(), "HH:mm");
+}
+
+function finiteNumber_(value) {
+  const parsed = Number(value || 0);
+  return isFinite(parsed) ? parsed : 0;
 }
 
 function json_(value) {
