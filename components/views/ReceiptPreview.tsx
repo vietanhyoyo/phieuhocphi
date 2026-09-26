@@ -1,23 +1,56 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, LoaderCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AppData, NoticeType } from "@/lib/types";
-import { exportReceiptToPng } from "@/lib/receipt-export";
+import { createReceiptPng, exportReceiptPng } from "@/lib/receipt-export";
 import { formatCurrency, getMonthlySummary, minutesLabel, monthLabel, slugify } from "@/lib/utils";
 
 export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppData; target: { studentId: string; month: string }; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void }) {
   const [isExporting, setIsExporting] = useState(false);
+  const [isPreparingPng, setIsPreparingPng] = useState(true);
+  const [receiptPng, setReceiptPng] = useState<Blob | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const noticeRef = useRef(onNotice);
+  noticeRef.current = onNotice;
   const summary = getMonthlySummary(data, target.month, target.studentId)[0];
   const student = data.students.find((item) => item.id === target.studentId);
-  const exportPng = async () => {
-    if (!summary || !student || !receiptRef.current || isExporting) return;
+  useEffect(() => {
+    const element = receiptRef.current;
+    if (!summary || !student || !element) {
+      setIsPreparingPng(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPreparingPng(true);
+    setReceiptPng(null);
+    void createReceiptPng(element).then((blob) => {
+      if (cancelled) return;
+      setReceiptPng(blob);
+      setIsPreparingPng(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setIsPreparingPng(false);
+      noticeRef.current("Không thể chuẩn bị ảnh phiếu lúc này. Vui lòng đóng và mở lại phiếu.", "error");
+    });
+
+    return () => { cancelled = true; };
+  }, [data, target.month, target.studentId]);
+
+  const exportPng = () => {
+    if (!summary || !student || !receiptPng || isExporting || isPreparingPng) return;
     setIsExporting(true);
     try {
-      await exportReceiptToPng(receiptRef.current, `hoc-phi-${slugify(student.name)}-${target.month}.png`);
-      onNotice("Đã xuất phiếu học phí dạng PNG.");
+      const method = exportReceiptPng(
+        receiptPng,
+        `hoc-phi-${slugify(student.name)}-${target.month}.png`,
+        () => onNotice("Không mở được bảng chia sẻ. Vui lòng nhấn xuất ảnh để thử lại.", "error"),
+      );
+      if (method === "shared") onNotice("Chọn “Lưu hình ảnh” trong bảng chia sẻ để lưu phiếu.");
+      else if (method === "opened") onNotice("Ảnh phiếu đã mở. Chạm giữ ảnh rồi chọn lưu vào Ảnh.");
+      else onNotice("Đã xuất phiếu học phí dạng PNG.");
     } catch {
       onNotice("Không thể xuất ảnh lúc này. Vui lòng thử lại.", "error");
     } finally {
@@ -29,7 +62,7 @@ export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppD
     <div className="receipt-toolbar">
       <button className="icon-button" onClick={onClose} aria-label="Đóng phiếu học phí"><ArrowLeft size={20} /></button>
       <div><span className="eyebrow">XEM TRƯỚC</span><strong>Phiếu học phí</strong></div>
-      <button className="primary-button small-button" onClick={exportPng} disabled={isExporting} aria-busy={isExporting}>{isExporting ? <LoaderCircle size={16} className="animate-spin" /> : <Download size={16} />} {isExporting ? "Đang xuất…" : "Xuất PNG"}</button>
+      <button className="primary-button small-button" onClick={exportPng} disabled={isExporting || isPreparingPng || !receiptPng} aria-busy={isExporting || isPreparingPng}>{isExporting || isPreparingPng ? <LoaderCircle size={16} className="animate-spin" /> : <Download size={16} />} {isPreparingPng ? "Đang chuẩn bị…" : isExporting ? "Đang xuất…" : "Xuất PNG"}</button>
     </div>
     <div className="receipt-scroll">
       <div ref={receiptRef} className="receipt-card">
