@@ -1,4 +1,4 @@
-import { toBlob } from "html-to-image";
+import { toCanvas } from "html-to-image";
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -16,40 +16,88 @@ async function embedImage(image: HTMLImageElement) {
   return blobToDataUrl(await response.blob());
 }
 
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not decode receipt image"));
+    image.src = dataUrl;
+  });
+}
+
+function clipRoundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.lineTo(x + width - r, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + r);
+  context.lineTo(x + width, y + height - r);
+  context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  context.lineTo(x + r, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - r);
+  context.lineTo(x, y + r);
+  context.quadraticCurveTo(x, y, x + r, y);
+  context.closePath();
+  context.clip();
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not encode receipt PNG")), "image/png");
+  });
+}
+
 /** Render the actual receipt so preview and PNG always share one layout. */
 export async function createReceiptPng(element: HTMLElement): Promise<Blob> {
   await document.fonts.ready;
+  const elementRect = element.getBoundingClientRect();
   const images = Array.from(element.querySelectorAll("img"));
-  const inlineImages = await Promise.all(images.map(async (image) => ({
-    image,
-    dataUrl: await embedImage(image),
-    src: image.getAttribute("src"),
-    srcSet: image.getAttribute("srcset"),
-  })));
+  const imageLayers = await Promise.all(images.map(async (image) => {
+    const rect = image.getBoundingClientRect();
+    const style = window.getComputedStyle(image);
+    const dataUrl = await embedImage(image);
+    return {
+      image: await loadImage(dataUrl),
+      x: rect.left - elementRect.left,
+      y: rect.top - elementRect.top,
+      width: rect.width,
+      height: rect.height,
+      radius: Number.parseFloat(style.borderTopLeftRadius) || 0,
+      objectFit: style.objectFit,
+    };
+  }));
 
-  try {
-    inlineImages.forEach(({ image, dataUrl }) => {
-      image.removeAttribute("srcset");
-      image.src = dataUrl;
-    });
-    await Promise.all(inlineImages.map(({ image }) => image.decode()));
+  const canvas = await toCanvas(element, {
+    pixelRatio: 3,
+    backgroundColor: "#ffffff",
+    preferredFontFormat: "woff2",
+    style: { margin: "0", boxShadow: "none" },
+  });
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not draw receipt images");
 
-    const blob = await toBlob(element, {
-      pixelRatio: 3,
-      backgroundColor: "#ffffff",
-      preferredFontFormat: "woff2",
-      style: { margin: "0", boxShadow: "none" },
-    });
-    if (!blob) throw new Error("Could not create receipt PNG");
-    return blob;
-  } finally {
-    inlineImages.forEach(({ image, src, srcSet }) => {
-      if (src === null) image.removeAttribute("src");
-      else image.setAttribute("src", src);
-      if (srcSet === null) image.removeAttribute("srcset");
-      else image.setAttribute("srcset", srcSet);
-    });
+  // Safari can omit <img> elements while rasterizing html-to-image's SVG.
+  // Composite them directly onto the final canvas for reliable output.
+  const scaleX = canvas.width / elementRect.width;
+  const scaleY = canvas.height / elementRect.height;
+  for (const layer of imageLayers) {
+    const x = layer.x * scaleX;
+    const y = layer.y * scaleY;
+    const width = layer.width * scaleX;
+    const height = layer.height * scaleY;
+    const fitScale = layer.objectFit === "cover"
+      ? Math.max(width / layer.image.naturalWidth, height / layer.image.naturalHeight)
+      : Math.min(width / layer.image.naturalWidth, height / layer.image.naturalHeight);
+    const drawWidth = layer.image.naturalWidth * fitScale;
+    const drawHeight = layer.image.naturalHeight * fitScale;
+
+    context.save();
+    clipRoundedRect(context, x, y, width, height, layer.radius * (scaleX + scaleY) / 2);
+    context.drawImage(layer.image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+    context.restore();
   }
+
+  return canvasToBlob(canvas);
 }
 
 export type ReceiptExportMethod = "shared" | "opened" | "downloaded";
