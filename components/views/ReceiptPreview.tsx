@@ -68,7 +68,7 @@ export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppD
       <div ref={receiptRef} className="receipt-card">
         <div className="receipt-top-decoration"><span /><span /><span /></div>
         <div className="receipt-heading-row">
-          <div className="receipt-brand"><span className="brand-mark brand-image"><img src="/app-logo.png" alt="Logo Sổ học phí" /></span><div><strong>SỔ HỌC PHÍ</strong><small>TRỢ LÝ GIA SƯ</small></div></div>
+          <div className="receipt-brand"><span className="brand-mark brand-image"><img src="/app-logo.png" width={1254} height={1254} alt="Logo Sổ học phí" /></span><div><strong>SỔ HỌC PHÍ</strong><small>TRỢ LÝ GIA SƯ</small></div></div>
           <div className="receipt-title"><span>PHIẾU HỌC PHÍ</span><h2>{monthLabel(target.month)}</h2></div>
         </div>
         <div className="receipt-student"><div><span>HỌC SINH</span><strong>{student.name}</strong></div>{student.parentName && <small>Phụ huynh: {student.parentName}</small>}</div>
@@ -80,7 +80,7 @@ export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppD
         <div className="receipt-dates"><span>NGÀY ĐÃ HỌC</span><div className="receipt-date-badges">{summary.lessonDates.map((date) => { const [, month, day] = date.split("-"); return <Badge variant="secondary" key={date}>{day}/{month}</Badge>; })}</div></div>
         <div className="receipt-qr">
           <span className="receipt-qr-label">THANH TOÁN CHUYỂN KHOẢN</span>
-          <img src="/payment-qr.jpg" alt="Mã QR chuyển khoản Techcombank" />
+          <img src="/payment-qr.jpg" width={640} height={720} alt="Mã QR chuyển khoản Techcombank" />
           <div className="receipt-payment-info"><strong>TECHCOMBANK</strong><small>DANH MINH HIEU</small><b>8804 0402 02</b><em>Quét mã để chuyển khoản</em></div>
         </div>
         <div className="receipt-footer"><span>Cảm ơn bạn đã đồng hành cùng lớp học ✦</span><small>Được tạo từ Sổ học phí</small></div>

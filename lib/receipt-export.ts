@@ -50,14 +50,18 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 /** Render the actual receipt so preview and PNG always share one layout. */
 export async function createReceiptPng(element: HTMLElement): Promise<Blob> {
   await document.fonts.ready;
-  const elementRect = element.getBoundingClientRect();
   const images = Array.from(element.querySelectorAll("img"));
-  const imageLayers = await Promise.all(images.map(async (image) => {
+  // Intrinsic image sizes can change the height of the entire receipt. Finish
+  // loading every image before measuring either the receipt or any image layer.
+  const decodedImages = await Promise.all(images.map(async (image) => loadImage(await embedImage(image))));
+  const elementRect = element.getBoundingClientRect();
+  if (elementRect.width <= 0 || elementRect.height <= 0) throw new Error("Receipt has no visible layout");
+  const imageLayers = images.map((image, index) => {
     const rect = image.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) throw new Error("Receipt image has no visible layout");
     const style = window.getComputedStyle(image);
-    const dataUrl = await embedImage(image);
     return {
-      image: await loadImage(dataUrl),
+      image: decodedImages[index],
       x: rect.left - elementRect.left,
       y: rect.top - elementRect.top,
       width: rect.width,
@@ -65,7 +69,7 @@ export async function createReceiptPng(element: HTMLElement): Promise<Blob> {
       radius: Number.parseFloat(style.borderTopLeftRadius) || 0,
       objectFit: style.objectFit,
     };
-  }));
+  });
 
   const canvas = await toCanvas(element, {
     pixelRatio: 3,
