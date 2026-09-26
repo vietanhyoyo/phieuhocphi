@@ -59,6 +59,56 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  if (!isAuthConfigured()) return NextResponse.json({ message: "Đăng nhập chưa được cấu hình." }, { status: 503 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ message: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." }, { status: 401 });
+
+  let body: { currentPassword?: unknown; newPassword?: unknown };
+  try {
+    body = await request.json() as { currentPassword?: unknown; newPassword?: unknown };
+  } catch {
+    return NextResponse.json({ message: "Thông tin đổi mật khẩu không hợp lệ." }, { status: 400 });
+  }
+
+  if (!validPassword(body.currentPassword) || !validPassword(body.newPassword)) {
+    return NextResponse.json({ message: "Mật khẩu phải có ít nhất 8 ký tự." }, { status: 400 });
+  }
+  if (body.currentPassword === body.newPassword) {
+    return NextResponse.json({ message: "Mật khẩu mới phải khác mật khẩu hiện tại." }, { status: 400 });
+  }
+
+  try {
+    const found = asUser((await callAppsScript({ action: "findUser", username: normalizeUsername(session.username) })).user);
+    if (!found || found.id !== session.id) return NextResponse.json({ message: "Không tìm thấy tài khoản." }, { status: 401 });
+    if (!verifyPassword(body.currentPassword, found)) {
+      return NextResponse.json({ message: "Mật khẩu hiện tại không đúng." }, { status: 401 });
+    }
+
+    const password = hashPassword(body.newPassword);
+    const result = await callAppsScript({
+      action: "updateUserPassword",
+      userId: session.id,
+      expectedPasswordHash: found.passwordHash,
+      expectedPasswordSalt: found.passwordSalt,
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      updatedAt: new Date().toISOString(),
+    });
+    if (result.updated !== true) {
+      return NextResponse.json({ message: "Mật khẩu tài khoản vừa thay đổi. Vui lòng đăng nhập lại rồi thử lại." }, { status: 409 });
+    }
+    const response = NextResponse.json({ message: "Đổi mật khẩu thành công." });
+    clearSession(response);
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Action không được hỗ trợ")) {
+      return NextResponse.json({ message: "Google Apps Script đang dùng phiên bản cũ. Hãy triển khai phiên bản mới rồi thử lại." }, { status: 503 });
+    }
+    return NextResponse.json({ message: "Không thể lưu mật khẩu vào Google Sheet lúc này. Vui lòng thử lại." }, { status: 502 });
+  }
+}
+
 export async function DELETE() {
   const response = NextResponse.json({ ok: true });
   clearSession(response);

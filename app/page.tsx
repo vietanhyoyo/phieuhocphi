@@ -22,6 +22,7 @@ import { AuthUser } from "@/lib/types";
 
 export default function Page() {
   const [auth, setAuth] = useState<{ loading: boolean; configured: boolean; authenticated: boolean; hasUsers: boolean; user: AuthUser | null; error?: string }>({ loading: true, configured: false, authenticated: true, hasUsers: false, user: null });
+  const [loginNotice, setLoginNotice] = useState("");
   const storageScope = auth.configured ? (auth.authenticated && auth.user ? auth.user.id : null) : "local";
   const app = useAppStore(storageScope);
 
@@ -33,7 +34,16 @@ export default function Page() {
   }, []);
 
   const handleAuthenticated = async (user: AuthUser) => {
+    app.setView("home");
+    app.setSelectedStudentId(null);
+    app.setSearch("");
+    setLoginNotice("");
     setAuth((current) => ({ ...current, authenticated: true, user }));
+  };
+
+  const handlePasswordChanged = () => {
+    setLoginNotice("Mật khẩu đã được đổi. Vui lòng đăng nhập lại bằng mật khẩu mới.");
+    setAuth((current) => ({ ...current, authenticated: false, user: null }));
   };
 
   const logout = async () => {
@@ -46,7 +56,7 @@ export default function Page() {
   }
 
   if (auth.error && auth.configured) return <main className="loading-screen"><span>{auth.error}</span></main>;
-  if (auth.configured && !auth.authenticated) return <AuthView hasUsers={auth.hasUsers} onAuthenticated={handleAuthenticated} />;
+  if (auth.configured && !auth.authenticated) return <AuthView hasUsers={auth.hasUsers} notice={loginNotice} onAuthenticated={handleAuthenticated} />;
   if (!app.hydrated) return <main className="loading-screen"><div className="loading-mark brand-image"><img src="/app-logo.png" alt="Logo Sổ học phí" /></div><span>Đang tải dữ liệu riêng của bạn…</span></main>;
 
   const selectedStudent = app.selectedStudentId ? app.data.students.find((student) => student.id === app.selectedStudentId) : null;
@@ -63,7 +73,7 @@ export default function Page() {
               <StudentsView data={app.data} search={app.search} setSearch={app.setSearch} onAdd={() => app.openStudent("new")} onEdit={app.openStudent} onSelect={(id) => app.setSelectedStudentId(id)} />
           )}
           {app.view === "tuition" && <TuitionView data={app.data} month={app.month} setMonth={app.setMonth} onReceipt={(studentId) => app.setReceiptTarget({ studentId, month: app.month })} onStudent={(id) => { app.setSelectedStudentId(id); app.setView("students"); }} />}
-          {app.view === "settings" && <SettingsView data={app.data} storageStatus={app.storageStatus} currentUser={auth.user} onLogout={logout} onBack={() => app.setView("home")} onAddSubject={() => app.openSubject("new")} onEditSubject={app.openSubject} onToggleSubject={app.toggleSubject} onBackup={() => exportBackup(app.data)} onRestore={() => app.restoreRef.current?.click()} />}
+          {app.view === "settings" && <SettingsView data={app.data} storageStatus={app.storageStatus} currentUser={auth.user} onLogout={logout} onPasswordChanged={handlePasswordChanged} onBack={() => app.setView("home")} onAddSubject={() => app.openSubject("new")} onEditSubject={app.openSubject} onToggleSubject={app.toggleSubject} onBackup={() => exportBackup(app.data)} onRestore={() => app.restoreRef.current?.click()} />}
         </div>
         {app.view !== "settings" && <BottomNav view={app.view} onChange={(next) => { app.setView(next); app.setSelectedStudentId(null); app.setSearch(""); }} />}
       </div>

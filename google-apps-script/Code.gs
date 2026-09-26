@@ -62,6 +62,7 @@ function handle_(action, payload) {
     return { ok: true, user };
   }
   if (action === "createUser") return createUser_(payload.user);
+  if (action === "updateUserPassword") return updateUserPassword_(payload);
   throw new Error("Action không được hỗ trợ.");
 }
 
@@ -84,6 +85,33 @@ function createUser_(user) {
     if (users.length === 0) claimLegacyData_(user.id);
     writeTable_(TABLES.users, users.concat([user]));
     return { ok: true, user };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateUserPassword_(payload) {
+  const userId = requiredUserId_(payload);
+  const expectedPasswordHash = String(payload.expectedPasswordHash || "");
+  const expectedPasswordSalt = String(payload.expectedPasswordSalt || "");
+  const passwordHash = String(payload.passwordHash || "");
+  const passwordSalt = String(payload.passwordSalt || "");
+  const updatedAt = String(payload.updatedAt || new Date().toISOString());
+  if (!/^[a-f0-9]{64}$/i.test(passwordHash) || !/^[a-f0-9]{32}$/i.test(passwordSalt)) throw new Error("Mật khẩu mới không hợp lệ.");
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const users = readTable_(TABLES.users);
+    const index = users.findIndex((user) => String(user.id) === userId);
+    if (index < 0) return { ok: true, updated: false };
+    const user = users[index];
+    if (String(user.passwordHash) !== expectedPasswordHash || String(user.passwordSalt) !== expectedPasswordSalt) {
+      return { ok: true, updated: false };
+    }
+    users[index] = Object.assign({}, user, { passwordHash, passwordSalt, updatedAt });
+    writeTable_(TABLES.users, users);
+    return { ok: true, updated: true };
   } finally {
     lock.releaseLock();
   }

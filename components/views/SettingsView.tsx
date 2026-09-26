@@ -1,10 +1,41 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Cloud, Download, Edit3, FileJson, LogOut, Plus, Power, ShieldCheck, Sparkles, Upload, WifiOff } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Cloud, Download, Edit3, FileJson, KeyRound, LogOut, Plus, Power, ShieldCheck, Sparkles, Upload, WifiOff } from "lucide-react";
+import { ChangePasswordModal } from "@/components/modals/ChangePasswordModal";
 import { AppData, AuthUser, Subject } from "@/lib/types";
 
-export function SettingsView({ data, storageStatus, currentUser, onLogout, onBack, onAddSubject, onEditSubject, onToggleSubject, onBackup, onRestore }: { data: AppData; storageStatus: "checking" | "local" | "cloud" | "syncing" | "error"; currentUser: AuthUser | null; onLogout: () => void; onBack: () => void; onAddSubject: () => void; onEditSubject: (subject: Subject) => void; onToggleSubject: (subject: Subject) => void; onBackup: () => void; onRestore: () => void }) {
+export function SettingsView({ data, storageStatus, currentUser, onLogout, onPasswordChanged, onBack, onAddSubject, onEditSubject, onToggleSubject, onBackup, onRestore }: { data: AppData; storageStatus: "checking" | "local" | "cloud" | "syncing" | "error"; currentUser: AuthUser | null; onLogout: () => void; onPasswordChanged: () => void; onBack: () => void; onAddSubject: () => void; onEditSubject: (subject: Subject) => void; onToggleSubject: (subject: Subject) => void; onBackup: () => void; onRestore: () => void }) {
+  const [changingPassword, setChangingPassword] = useState(false);
   const storageLabel = storageStatus === "cloud" ? "Đã đồng bộ Google Sheet" : storageStatus === "syncing" ? "Đang đồng bộ Google Sheet…" : storageStatus === "error" ? "Đang lưu tạm trên thiết bị" : storageStatus === "checking" ? "Đang kiểm tra nơi lưu trữ…" : "Chỉ lưu trên thiết bị";
   const StorageIcon = storageStatus === "local" || storageStatus === "error" ? WifiOff : storageStatus === "cloud" ? CheckCircle2 : Cloud;
-  return <div className="view-stack settings-view"><div className="settings-intro"><span className="settings-badge"><ShieldCheck size={17} /> Dữ liệu riêng tư</span><h2>Cài đặt sổ học phí</h2><p>Thông tin học sinh, học phí và buổi dạy được đồng bộ lên Google Sheet khi đã cấu hình kết nối.</p></div><section className="settings-section"><div className="storage-status"><StorageIcon size={17} /><span><strong>{storageLabel}</strong><small>localStorage vẫn giữ bản đệm để dùng khi mất mạng.</small></span></div></section><section className="settings-section"><div className="section-heading"><div><span className="section-kicker">DANH MỤC</span><h3>Môn học</h3></div><button className="text-button" onClick={onAddSubject}><Plus size={15} /> Thêm môn</button></div><div className="settings-list">{data.subjects.map((subject) => <div className="settings-row" key={subject.id}><span className={`subject-status ${subject.active ? "on" : "off"}`}><BookOpen size={16} /></span><div><strong>{subject.name}</strong><span>{subject.active ? "Đang hoạt động" : "Đã tạm ngưng"}</span></div><div className="row-actions always"><button onClick={() => onEditSubject(subject)} aria-label="Đổi tên môn"><Edit3 size={15} /></button><button onClick={() => onToggleSubject(subject)} aria-label={subject.active ? "Tạm ngưng môn" : "Bật môn"}><Power size={15} /></button></div></div>)}</div><p className="section-hint"><ShieldCheck size={14} /> Môn đã có trong lịch sử sẽ được tạm ngưng thay vì xóa.</p></section><section className="settings-section"><div className="section-heading"><div><span className="section-kicker">DỮ LIỆU</span><h3>Backup & restore</h3></div><span className="heading-icon green-tint"><FileJson size={19} /></span></div><div className="data-actions"><button onClick={onBackup}><span className="data-action-icon blue"><Download size={18} /></span><span><strong>Xuất bản sao lưu</strong><small>Tải toàn bộ dữ liệu thành file JSON</small></span><ChevronRight size={17} /></button><button onClick={onRestore}><span className="data-action-icon green"><Upload size={18} /></span><span><strong>Khôi phục dữ liệu</strong><small>Nhập lại từ file backup đã lưu</small></span><ChevronRight size={17} /></button></div><div className="data-warning"><AlertTriangle size={16} /><span>Backup định kỳ giúp bạn không mất dữ liệu khi đổi thiết bị hoặc xóa trình duyệt.</span></div></section>{currentUser && <section className="settings-section"><div className="section-heading"><div><span className="section-kicker">TÀI KHOẢN</span><h3>{currentUser.username}</h3></div><button className="text-button danger-text" onClick={onLogout}><LogOut size={15} /> Đăng xuất</button></div></section>}<section className="about-card"><div className="brand-mark brand-image small"><img src="/app-logo.png" alt="Logo Sổ học phí" /></div><div><strong>Sổ học phí</strong><span>Google Sheet + bản đệm offline</span></div><Sparkles size={17} /></section><button className="back-link centered" onClick={onBack}><ArrowLeft size={16} /> Về trang chủ</button></div>;
+
+  return <div className="view-stack settings-view">
+    <div className="settings-intro"><span className="settings-badge"><ShieldCheck size={17} /> Dữ liệu riêng tư</span><h2>Cài đặt sổ học phí</h2><p>Thông tin học sinh, học phí và buổi dạy được đồng bộ lên Google Sheet khi đã cấu hình kết nối.</p></div>
+    <section className="settings-section"><div className="storage-status"><StorageIcon size={17} /><span><strong>{storageLabel}</strong><small>localStorage vẫn giữ bản đệm để dùng khi mất mạng.</small></span></div></section>
+
+    <section className="settings-section">
+      <div className="section-heading"><div><span className="section-kicker">DANH MỤC</span><h3>Môn học</h3></div><button className="text-button" onClick={onAddSubject}><Plus size={15} /> Thêm môn</button></div>
+      <div className="settings-list">{data.subjects.map((subject) => <div className="settings-row" key={subject.id}><span className={`subject-status ${subject.active ? "on" : "off"}`}><BookOpen size={16} /></span><div><strong>{subject.name}</strong><span>{subject.active ? "Đang hoạt động" : "Đã tạm ngưng"}</span></div><div className="row-actions always"><button onClick={() => onEditSubject(subject)} aria-label="Đổi tên môn"><Edit3 size={15} /></button><button onClick={() => onToggleSubject(subject)} aria-label={subject.active ? "Tạm ngưng môn" : "Bật môn"}><Power size={15} /></button></div></div>)}</div>
+      <p className="section-hint"><ShieldCheck size={14} /> Môn đã có trong lịch sử sẽ được tạm ngưng thay vì xóa.</p>
+    </section>
+
+    <section className="settings-section">
+      <div className="section-heading"><div><span className="section-kicker">DỮ LIỆU</span><h3>Backup & restore</h3></div><span className="heading-icon green-tint"><FileJson size={19} /></span></div>
+      <div className="data-actions">
+        <button onClick={onBackup}><span className="data-action-icon blue"><Download size={18} /></span><span><strong>Xuất bản sao lưu</strong><small>Tải toàn bộ dữ liệu thành file JSON</small></span><ChevronRight size={17} /></button>
+        <button onClick={onRestore}><span className="data-action-icon green"><Upload size={18} /></span><span><strong>Khôi phục dữ liệu</strong><small>Nhập lại từ file backup đã lưu</small></span><ChevronRight size={17} /></button>
+      </div>
+      <div className="data-warning"><AlertTriangle size={16} /><span>Backup định kỳ giúp bạn không mất dữ liệu khi đổi thiết bị hoặc xóa trình duyệt.</span></div>
+    </section>
+
+    {currentUser && <section className="settings-section">
+      <div className="section-heading"><div><span className="section-kicker">TÀI KHOẢN</span><h3>{currentUser.username}</h3></div><button className="text-button danger-text" onClick={onLogout}><LogOut size={15} /> Đăng xuất</button></div>
+      <button className="settings-row settings-password-button" onClick={() => setChangingPassword(true)}><span className="config-icon"><KeyRound size={16} /></span><div><strong>Đổi mật khẩu</strong><span>Cập nhật mật khẩu đăng nhập</span></div><ChevronRight size={17} /></button>
+    </section>}
+
+    <section className="about-card"><div className="brand-mark brand-image small"><img src="/app-logo.png" alt="Logo Sổ học phí" /></div><div><strong>Sổ học phí</strong><span>Google Sheet + bản đệm offline</span></div><Sparkles size={17} /></section>
+    <button className="back-link centered" onClick={onBack}><ArrowLeft size={16} /> Về trang chủ</button>
+    {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} onPasswordChanged={onPasswordChanged} />}
+  </div>;
 }
