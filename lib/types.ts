@@ -1,4 +1,4 @@
-export type View = "home" | "lessons" | "students" | "tuition" | "settings";
+export type View = "home" | "lessons" | "students" | "tuition" | "timetable" | "settings";
 export type NoticeType = "success" | "error";
 export type Notice = { type: NoticeType; message: string } | null;
 export type AuthUser = { id: string; username: string };
@@ -55,12 +55,28 @@ export interface Lesson {
   updatedAt: string;
 }
 
+export interface TimetableEntry {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  title: string;
+  studentName: string;
+  mode: "in-person" | "online";
+  color: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppData {
   version: number;
   subjects: Subject[];
   students: Student[];
   studentSubjects: StudentSubject[];
   lessons: Lesson[];
+  timetable: TimetableEntry[];
+  timetableTitle: string;
 }
 
 export interface MonthlySubjectSummary {

@@ -1,12 +1,13 @@
 "use client";
 
-import { Home, NotebookPen, Users, WalletCards } from "lucide-react";
+import { CalendarDays, Home, NotebookPen, Users, WalletCards } from "lucide-react";
 import { View } from "@/lib/types";
 
 export function BottomNav({ view, onChange }: { view: View; onChange: (view: View) => void }) {
   const items: { key: View; label: string; icon: typeof Home }[] = [
     { key: "home", label: "Trang chủ", icon: Home },
     { key: "lessons", label: "Buổi dạy", icon: NotebookPen },
+    { key: "timetable", label: "Lịch", icon: CalendarDays },
     { key: "students", label: "Học sinh", icon: Users },
     { key: "tuition", label: "Học phí", icon: WalletCards },
   ];

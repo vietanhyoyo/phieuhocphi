@@ -26,6 +26,7 @@ Xem hướng dẫn chi tiết tại [`docs/google-sheets-setup-vi.md`](./docs/go
 
 - Đăng ký, đăng nhập và đăng xuất nhiều tài khoản.
 - Quản lý học sinh, môn học, buổi dạy và học phí.
+- Quản lý thời khóa biểu hằng tuần theo khung giờ, thêm ca vào nhiều ngày, màu riêng, trực tiếp/online, kiểm tra trùng giờ và xuất PNG.
 - Dữ liệu được phân tách theo tài khoản bằng `userId`.
 - Hỗ trợ backup/restore và lưu đệm offline.
 

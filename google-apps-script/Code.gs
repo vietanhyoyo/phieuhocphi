@@ -10,6 +10,8 @@ const TABLES = {
   students: { name: "App_Students", headers: ["id", "name", "phone", "parentName", "parentPhone", "note", "active", "createdAt", "updatedAt", "userId"] },
   studentSubjects: { name: "App_StudentSubjects", headers: ["id", "studentId", "subjectId", "defaultFee", "defaultDurationMinutes", "active", "createdAt", "updatedAt", "userId"] },
   lessons: { name: "App_Lessons", headers: ["id", "studentId", "subjectId", "lessonDate", "startTime", "durationMinutes", "fee", "note", "createdAt", "updatedAt", "userId"] },
+  timetable: { name: "App_Timetable", headers: ["id", "dayOfWeek", "startTime", "endTime", "title", "studentName", "mode", "color", "note", "createdAt", "updatedAt", "userId"] },
+  timetableSettings: { name: "App_TimetableSettings", headers: ["id", "title", "userId"] },
 };
 
 function doGet(event) {
@@ -170,10 +172,13 @@ function readAppData_(userId) {
   const students = readUserTable_(TABLES.students, userId);
   const studentSubjects = readUserTable_(TABLES.studentSubjects, userId);
   const lessons = readUserTable_(TABLES.lessons, userId);
-  if (!subjects.length && !students.length && !studentSubjects.length && !lessons.length) return null;
+  const timetable = readUserTable_(TABLES.timetable, userId);
+  const timetableSettings = readUserTable_(TABLES.timetableSettings, userId);
+  const timetableTitle = timetableSettings.length ? String(timetableSettings[0].title || "Thời khóa biểu") : "Thời khóa biểu";
+  if (!subjects.length && !students.length && !studentSubjects.length && !lessons.length && !timetable.length && !timetableSettings.length) return null;
   const meta = readTable_(TABLES.meta);
   const version = Number((meta.find((item) => item.key === "version") || {}).value || 1);
-  return { version, subjects, students, studentSubjects, lessons };
+  return { version, subjects, students, studentSubjects, lessons, timetable, timetableTitle };
 }
 
 function readUserTable_(table, userId) {
@@ -195,6 +200,7 @@ function migrateSingleAccountLegacyData_(userId) {
 
 function saveAppData_(userId, data) {
   if (!data || !Array.isArray(data.subjects) || !Array.isArray(data.students) || !Array.isArray(data.studentSubjects) || !Array.isArray(data.lessons)) throw new Error("Dữ liệu ứng dụng không hợp lệ.");
+  validateTimetable_(data);
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -203,9 +209,43 @@ function saveAppData_(userId, data) {
     mergeUserTable_(TABLES.students, userId, data.students);
     mergeUserTable_(TABLES.studentSubjects, userId, data.studentSubjects);
     mergeUserTable_(TABLES.lessons, userId, data.lessons);
+    // Older clients omit these fields: preserve the existing weekly schedule.
+    if (Array.isArray(data.timetable)) mergeUserTable_(TABLES.timetable, userId, data.timetable);
+    if (typeof data.timetableTitle === "string") mergeUserTable_(TABLES.timetableSettings, userId, [{ id: "title", title: data.timetableTitle }]);
   } finally {
     lock.releaseLock();
   }
+}
+
+function validateTimetable_(data) {
+  if (data.timetableTitle !== undefined && (typeof data.timetableTitle !== "string" || data.timetableTitle.length > 120)) throw new Error("Tiêu đề thời khóa biểu không hợp lệ.");
+  if (data.timetable === undefined) return;
+  if (!Array.isArray(data.timetable)) throw new Error("Thời khóa biểu không hợp lệ.");
+  const ids = new Set();
+  const colors = ["#fef08a", "#fdba74", "#67e8f9", "#bbf7d0", "#ddd6fe", "#fbcfe8"];
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+  data.timetable.forEach((item) => {
+    if (!item || typeof item.id !== "string" || !item.id || ids.has(item.id)
+      || !Number.isInteger(item.dayOfWeek) || item.dayOfWeek < 1 || item.dayOfWeek > 7
+      || !time.test(item.startTime) || !time.test(item.endTime) || item.startTime >= item.endTime
+      || typeof item.title !== "string" || !item.title.trim() || item.title.length > 100
+      || typeof item.studentName !== "string" || item.studentName.length > 100
+      || (item.mode !== "online" && item.mode !== "in-person") || colors.indexOf(item.color) < 0
+      || typeof item.note !== "string" || item.note.length > 300
+      || typeof item.createdAt !== "string" || typeof item.updatedAt !== "string") throw new Error("Ca trong thời khóa biểu không hợp lệ.");
+    ids.add(item.id);
+  });
+}
+
+// Creates only missing timetable tabs; existing sheets and records are untouched.
+function setupTimetable() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    [TABLES.timetable, TABLES.timetableSettings].forEach((table) => {
+      if (!spreadsheet_().getSheetByName(table.name)) writeTable_(table, []);
+    });
+  } finally { lock.releaseLock(); }
 }
 
 function mergeUserTable_(table, userId, records) {
@@ -231,9 +271,10 @@ function readTable_(table) {
     const item = {};
     table.headers.forEach((header, index) => { item[header] = row[index]; });
     ["active"].forEach((key) => { if (key in item) item[key] = item[key] === true || String(item[key]).toLowerCase() === "true"; });
-    ["defaultFee", "defaultDurationMinutes", "durationMinutes", "fee"].forEach((key) => { if (key in item) item[key] = finiteNumber_(item[key]); });
+    ["defaultFee", "defaultDurationMinutes", "durationMinutes", "fee", "dayOfWeek"].forEach((key) => { if (key in item) item[key] = finiteNumber_(item[key]); });
     if ("lessonDate" in item) item.lessonDate = normalizeDateCell_(item.lessonDate);
     if ("startTime" in item) item.startTime = normalizeTimeCell_(item.startTime);
+    if ("endTime" in item) item.endTime = normalizeTimeCell_(item.endTime);
     return item;
   });
 }
@@ -243,6 +284,7 @@ function writeTable_(table, records) {
   sheet.clearContents();
   const rows = [table.headers].concat((records || []).map((record) => table.headers.map((header) => record[header] === undefined ? "" : record[header])));
   if (table === TABLES.users && rows.length > 1) sheet.getRange(2, 7, rows.length - 1, 4).setNumberFormat("@");
+  if (table === TABLES.timetable && rows.length > 1) sheet.getRange(2, 3, rows.length - 1, 2).setNumberFormat("@");
   sheet.getRange(1, 1, rows.length, table.headers.length).setValues(rows);
   sheet.setFrozenRows(1);
 }

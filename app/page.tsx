@@ -9,6 +9,7 @@ import { LessonsView } from "@/components/views/LessonsView";
 import { StudentsView } from "@/components/views/StudentsView";
 import { StudentDetail } from "@/components/views/StudentDetail";
 import { TuitionView } from "@/components/views/TuitionView";
+import { TimetableView } from "@/components/views/TimetableView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { ReceiptPreview } from "@/components/views/ReceiptPreview";
 import { LessonModal } from "@/components/modals/LessonModal";
@@ -73,6 +74,7 @@ export default function Page() {
               <StudentsView data={app.data} search={app.search} setSearch={app.setSearch} onAdd={() => app.openStudent("new")} onEdit={app.openStudent} onSelect={(id) => app.setSelectedStudentId(id)} />
           )}
           {app.view === "tuition" && <TuitionView data={app.data} month={app.month} setMonth={app.setMonth} onReceipt={(studentId) => app.setReceiptTarget({ studentId, month: app.month })} onStudent={(id) => { app.setSelectedStudentId(id); app.setView("students"); }} />}
+          {app.view === "timetable" && <TimetableView key={storageScope} data={app.data} loading={app.storageStatus === "checking"} onSave={app.saveTimetable} onDelete={app.removeTimetable} onTitle={app.saveTimetableTitle} />}
           {app.view === "settings" && <SettingsView data={app.data} storageStatus={app.storageStatus} currentUser={auth.user} onLogout={logout} onPasswordChanged={handlePasswordChanged} onBack={() => app.setView("home")} onAddSubject={() => app.openSubject("new")} onEditSubject={app.openSubject} onToggleSubject={app.toggleSubject} onBackup={() => exportBackup(app.data)} onRestore={() => app.restoreRef.current?.click()} />}
         </div>
         {app.view !== "settings" && <BottomNav view={app.view} onChange={(next) => { app.setView(next); app.setSelectedStudentId(null); app.setSearch(""); }} />}

@@ -1,4 +1,5 @@
 import { AppData } from "./types";
+import { isTimetableEntry } from "./timetable";
 
 export const STORAGE_KEY = "tutor-manager:data";
 export const DATA_VERSION = 1;
@@ -47,6 +48,8 @@ function normalizeBoolean(value: unknown) {
 export function normalizeAppData(data: AppData): AppData {
   return {
     ...data,
+    timetable: (data.timetable ?? []).map((item) => ({ ...item, dayOfWeek: Number(item.dayOfWeek), startTime: normalizeTimeValue(item.startTime), endTime: normalizeTimeValue(item.endTime) })),
+    timetableTitle: data.timetableTitle ?? "Thời khóa biểu",
     subjects: data.subjects.map((subject) => ({ ...subject, active: normalizeBoolean(subject.active) })),
     students: data.students.map((student) => ({ ...student, active: normalizeBoolean(student.active) })),
     studentSubjects: data.studentSubjects.map((item) => ({ ...item, defaultFee: normalizeNumber(item.defaultFee), defaultDurationMinutes: normalizeNumber(item.defaultDurationMinutes), active: normalizeBoolean(item.active) })),
@@ -70,6 +73,8 @@ export function createInitialData(): AppData {
     students: [],
     studentSubjects: [],
     lessons: [],
+    timetable: [],
+    timetableTitle: "Thời khóa biểu",
   };
 }
 
@@ -110,7 +115,9 @@ export function isValidAppData(value: unknown): value is AppData {
     Array.isArray(candidate.subjects) &&
     Array.isArray(candidate.students) &&
     Array.isArray(candidate.studentSubjects) &&
-    Array.isArray(candidate.lessons)
+    Array.isArray(candidate.lessons) &&
+    (candidate.timetable === undefined || (Array.isArray(candidate.timetable) && candidate.timetable.every(isTimetableEntry) && new Set(candidate.timetable.map((item) => item.id)).size === candidate.timetable.length)) &&
+    (candidate.timetableTitle === undefined || (typeof candidate.timetableTitle === "string" && candidate.timetableTitle.length <= 120))
   );
 }
 

@@ -19,7 +19,7 @@ function TimeStepper({ label, value, onDecrease, onIncrease }: { label: string; 
   </div>;
 }
 
-export function VietnameseTimePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function VietnameseTimePicker({ value, onChange, label = "Giờ bắt đầu" }: { value: string; onChange: (value: string) => void; label?: string }) {
   const [open, setOpen] = useState(false);
   const [hour = "09", minute = "00"] = (value || "09:00").split(":");
   const updateTime = (nextHour: number, nextMinute: number) => {
@@ -30,10 +30,10 @@ export function VietnameseTimePicker({ value, onChange }: { value: string; onCha
   const changeMinute = (amount: number) => updateTime(Number(hour), Number(minute) + amount);
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger asChild>
-      <Button type="button" variant="outline" className="vi-picker-trigger w-full justify-start bg-slate-50 font-normal text-slate-700 hover:bg-slate-50" aria-label="Chọn giờ bắt đầu"><Clock3 className="h-4 w-4 text-slate-400" /><span>{value || "09:00"}</span><ChevronDown className="ml-auto h-4 w-4 text-slate-400" /></Button>
+      <Button type="button" variant="outline" className="vi-picker-trigger w-full justify-start bg-slate-50 font-normal text-slate-700 hover:bg-slate-50" aria-label={`Chọn ${label.toLowerCase()}`}><Clock3 className="h-4 w-4 text-slate-400" /><span>{value || "09:00"}</span><ChevronDown className="ml-auto h-4 w-4 text-slate-400" /></Button>
     </PopoverTrigger>
-    <PopoverContent className="w-[min(18rem,calc(100vw-2rem))] rounded-2xl border-slate-200 p-4 shadow-xl" align="end">
-      <div className="mb-4 flex items-center justify-between"><p className="text-sm font-semibold text-slate-700">Chọn giờ bắt đầu</p><Badge variant="secondary" className="text-sm tabular-nums">{hour}:{minute}</Badge></div>
+    <PopoverContent className="w-[min(18rem,calc(100vw-2rem))] rounded-2xl border-slate-200 p-4 shadow-xl" align="end" sideOffset={8} collisionPadding={12} aria-label={`Chọn ${label.toLowerCase()}`}>
+      <div className="mb-4 flex items-center justify-between"><p className="text-sm font-semibold text-slate-700">Chọn {label.toLowerCase()}</p><Badge variant="secondary" className="text-sm tabular-nums">{hour}:{minute}</Badge></div>
       <div className="grid grid-cols-2 gap-3">
         <TimeStepper label="Giờ" value={hour} onDecrease={() => changeHour(-1)} onIncrease={() => changeHour(1)} />
         <TimeStepper label="Phút" value={minute} onDecrease={() => changeMinute(-5)} onIncrease={() => changeMinute(5)} />

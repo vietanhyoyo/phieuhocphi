@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AppData, Lesson, Notice, NoticeType, Student, StudentDraft, StudentSubject, Subject } from "@/lib/types";
+import { AppData, Lesson, Notice, NoticeType, Student, StudentDraft, StudentSubject, Subject, TimetableEntry, View } from "@/lib/types";
+import { isTimetableEntry, timetableConflict, WEEKDAYS } from "@/lib/timetable";
 import { createInitialData, isValidAppData, loadData, normalizeAppData, saveData } from "@/lib/storage";
 import { loadRemoteData, saveRemoteData } from "@/lib/cloud-storage";
 import { currentDate, currentMonth, emptyStudentDraft, uid } from "@/lib/utils";
@@ -11,7 +12,7 @@ export type AppStore = ReturnType<typeof useAppStore>;
 export function useAppStore(accountId: string | null) {
   const [data, setData] = useState<AppData>(createInitialData);
   const [hydrated, setHydrated] = useState(false);
-  const [view, setView] = useState<"home" | "lessons" | "students" | "tuition" | "settings">("home");
+  const [view, setView] = useState<View>("home");
   const [month, setMonth] = useState(currentMonth());
   const [search, setSearch] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -29,6 +30,8 @@ export function useAppStore(accountId: string | null) {
   const latestDataRef = useRef<AppData>(createInitialData());
   const saveQueueRef = useRef(Promise.resolve());
   const syncErrorShownRef = useRef(false);
+  const activeAccountRef = useRef(accountId);
+  activeAccountRef.current = accountId;
 
   const storageScope = accountId ?? "guest";
 
@@ -61,15 +64,15 @@ export function useAppStore(accountId: string | null) {
     if (!ownerId || !cloudEnabledRef.current) return;
     saveQueueRef.current = saveQueueRef.current
       .then(async () => {
-        if (ownerId !== accountId) return;
+        if (ownerId !== activeAccountRef.current) return;
         setStorageStatus("syncing");
         await saveRemoteData(next);
-        if (ownerId !== accountId) return;
+        if (ownerId !== activeAccountRef.current) return;
         setStorageStatus("cloud");
         syncErrorShownRef.current = false;
       })
       .catch(() => {
-        if (ownerId !== accountId) return;
+        if (ownerId !== activeAccountRef.current) return;
         setStorageStatus("error");
         if (!syncErrorShownRef.current) {
           syncErrorShownRef.current = true;
@@ -83,7 +86,7 @@ export function useAppStore(accountId: string | null) {
     setStorageStatus("checking");
     try {
       const remote = await loadRemoteData();
-      if (ownerId !== accountId) return;
+      if (ownerId !== activeAccountRef.current) return;
       if (!remote.configured) {
         cloudEnabledRef.current = false;
         setStorageStatus("local");
@@ -96,11 +99,11 @@ export function useAppStore(accountId: string | null) {
         saveData(remote.data, storageScope);
       } else {
         await saveRemoteData(fallbackData);
-        if (ownerId !== accountId) return;
+        if (ownerId !== activeAccountRef.current) return;
       }
       setStorageStatus("cloud");
     } catch {
-      if (ownerId !== accountId) return;
+      if (ownerId !== activeAccountRef.current) return;
       cloudEnabledRef.current = false;
       setStorageStatus("error");
     }
@@ -249,6 +252,31 @@ export function useAppStore(accountId: string | null) {
     reader.readAsText(file);
   };
 
+  const saveTimetable = (entries: TimetableEntry[]) => {
+    if (!entries.length || !entries.every(isTimetableEntry)) return "Thông tin lịch dạy không hợp lệ.";
+    const current = latestDataRef.current;
+    const ids = new Set(entries.map((entry) => entry.id));
+    const untouched = current.timetable.filter((entry) => !ids.has(entry.id));
+    for (const entry of entries) {
+      const conflict = timetableConflict([...untouched, ...entries], entry);
+      if (conflict) return `${WEEKDAYS[entry.dayOfWeek - 1]} trùng giờ với ${conflict.title} (${conflict.startTime} – ${conflict.endTime}).`;
+    }
+    updateData({ ...current, timetable: [...untouched, ...entries] });
+    notify("Đã lưu thời khóa biểu.");
+    return null;
+  };
+
+  const removeTimetable = (id: string) => {
+    const current = latestDataRef.current;
+    updateData({ ...current, timetable: current.timetable.filter((item) => item.id !== id) });
+    notify("Đã xóa ca khỏi thời khóa biểu.");
+  };
+
+  const saveTimetableTitle = (title: string) => {
+    updateData({ ...latestDataRef.current, timetableTitle: title.trim().slice(0, 120) || "Thời khóa biểu" });
+    notify("Đã lưu tiêu đề thời khóa biểu.");
+  };
+
   return {
     data, hydrated, view, setView, month, setMonth, search, setSearch,
     selectedStudentId, setSelectedStudentId,
@@ -260,5 +288,6 @@ export function useAppStore(accountId: string | null) {
     openStudent, saveStudent, toggleStudentActive,
     openSubject, saveSubject, toggleSubject,
     saveLesson, removeLesson, openRestore, notify,
+    saveTimetable, removeTimetable, saveTimetableTitle,
   };
 }

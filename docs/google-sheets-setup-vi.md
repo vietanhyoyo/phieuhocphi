@@ -43,6 +43,8 @@ npm run dev
 Lần đồng bộ đầu tiên, Apps Script tự tạo các tab:
 
 - `App_Meta`
+- `App_Timetable`
+- `App_TimetableSettings`
 - `App_Users`
 - `App_Subjects`
 - `App_Students`
@@ -81,6 +83,27 @@ cùng quy tắc. Có thể chạy lại để đồng bộ các dòng đã có.
 chuyển khoản theo email, không dùng cấu hình khác trong Sheet để thay đổi quy
 tắc này. Nếu tải tài khoản thất bại, nút xuất bị khóa và hiển thị lỗi để thử lại.
 Chế độ dùng trên máy không đăng nhập cũng dùng thông tin Danh Minh Hiếu.
+
+## Thời khóa biểu hằng tuần
+
+Mục **Lịch tuần** lưu các ca lặp lại từ Thứ 2 đến Chủ nhật. Mỗi ca có giờ bắt đầu,
+giờ kết thúc, môn/lớp, học sinh hoặc nhóm học, hình thức học, màu và ghi chú.
+Có thể chọn nhiều ngày khi thêm mới; sửa/xóa áp dụng cho từng ca. Các ca trùng
+giờ trong cùng ngày được báo lỗi; hai ca nối tiếp nhau được phép.
+
+`App_Timetable` dùng các cột `id`, `dayOfWeek` (1 = Thứ 2, 7 = Chủ nhật),
+`startTime`, `endTime`, `title`, `studentName`, `mode`, `color`, `note`,
+`createdAt`, `updatedAt`, `userId`. `App_TimetableSettings` chứa `id`, `title`,
+`userId` để lưu tiêu đề riêng cho từng tài khoản. Giờ lưu dưới dạng văn bản
+`HH:mm`. Lịch tuần không tự tạo buổi dạy hoặc cộng vào học phí.
+
+Sau khi cập nhật và triển khai Apps Script, chạy `setupTimetable` để tạo hai tab
+còn thiếu; hàm giữ nguyên tab đã có. Các phiên bản ứng dụng cũ không gửi trường
+lịch tuần sẽ không xóa lịch khi đồng bộ. Bản sao lưu cũ vẫn đọc được, lịch tuần
+ban đầu là rỗng. Backup mới bao gồm cả lịch và tiêu đề.
+
+Trong **Lịch tuần**, chạm vào một ô có lịch để chỉnh sửa ca học. Lịch mới được lưu
+tạm trên thiết bị trước rồi đồng bộ Sheet theo trạng thái hiển thị của ứng dụng.
 
 ## Lưu ý bảo mật
 
