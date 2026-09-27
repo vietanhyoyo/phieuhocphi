@@ -85,7 +85,7 @@ export default function Page() {
       {app.studentModal && <StudentModal data={app.data} draft={app.studentDraft} setDraft={app.setStudentDraft} initial={app.studentModal === "new" ? null : app.studentModal} onClose={() => app.setStudentModal(null)} onSave={app.saveStudent} />}
       {app.subjectModal && <SubjectModal initial={app.subjectModal === "new" ? null : app.subjectModal} name={app.subjectName} setName={app.setSubjectName} onClose={() => app.setSubjectModal(null)} onSave={app.saveSubject} />}
       {app.confirmDelete && <ConfirmModal title="Xóa buổi dạy?" message="Buổi này sẽ bị xóa khỏi lịch sử và tổng học phí tháng sẽ được tính lại." confirmLabel="Xóa buổi dạy" onClose={() => app.setConfirmDelete(null)} onConfirm={app.removeLesson} />}
-      {app.receiptTarget && <ReceiptPreview data={app.data} target={app.receiptTarget} onClose={() => app.setReceiptTarget(null)} onNotice={app.notify} />}
+      {app.receiptTarget && <ReceiptPreview key={auth.user?.id ?? "local"} data={app.data} currentUser={auth.user} target={app.receiptTarget} onClose={() => app.setReceiptTarget(null)} onNotice={app.notify} />}
       {app.notice && <div className={`toast ${app.notice.type === "error" ? "toast-error" : ""}`}><span className="toast-icon">{app.notice.type === "error" ? <AlertTriangle size={17} /> : <Check size={17} />}</span>{app.notice.message}</div>}
     </main>
   );

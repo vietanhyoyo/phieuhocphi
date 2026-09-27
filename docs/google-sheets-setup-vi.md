@@ -55,6 +55,33 @@ Nếu sheet chưa có dữ liệu, dữ liệu hiện có trong localStorage s�
 
 Các tab dữ liệu có thêm cột `userId`. Khi tài khoản đăng nhập, Apps Script chỉ tải và cập nhật các dòng có đúng `userId` đó; học sinh, môn học, buổi dạy và học phí giữa các tài khoản không bị trộn lẫn. Dữ liệu cũ chưa có `userId` sẽ được gán cho tài khoản đầu tiên khi Sheet vẫn chỉ có một tài khoản.
 
+## Thông tin chuyển khoản theo tài khoản
+
+Tab `App_Users` giữ các cột A:F hiện tại và bổ sung bốn cột G:J:
+
+| Cột | Tên | Nội dung |
+| --- | --- | --- |
+| G | `bankName` | Tên ngân hàng, ví dụ `MB BANK` |
+| H | `bankAccountName` | Tên chủ tài khoản, ví dụ `DANG VU KHA` |
+| I | `bankAccountNumber` | Số tài khoản, định dạng văn bản để giữ số 0 đầu |
+| J | `bankQrImage` | Đường dẫn ảnh trong `public`, ví dụ `/dang-vu-kha-qr.png` |
+
+Quy tắc áp dụng cho cả tài khoản hiện có và tài khoản đăng ký mới:
+
+- Chỉ `khadang2004cm@gmail.com` dùng MB BANK, DANG VU KHA, `20402023979`, ảnh `/dang-vu-kha-qr.png`.
+- Tất cả tài khoản còn lại dùng TECHCOMBANK, DANH MINH HIEU, `8804040202`, ảnh `/danh-minh-hieu-qr.png`.
+
+Khi nâng cấp, cập nhật Apps Script từ `google-apps-script/Code.gs`, cập nhật bản
+triển khai Web App hiện có bằng phiên bản mới (giữ nguyên URL `/exec`), rồi chạy
+`setupBankAccounts`. Hàm này ghi cấu hình theo quy tắc trên vào G:J của mọi tài
+khoản hiện có, giữ nguyên dữ liệu đăng nhập. Đăng ký mới tự điền ngân hàng theo
+cùng quy tắc. Có thể chạy lại để đồng bộ các dòng đã có.
+
+Ứng dụng xác minh tài khoản từ Sheet mỗi lần mở phiếu và chọn trọn bộ thông tin
+chuyển khoản theo email, không dùng cấu hình khác trong Sheet để thay đổi quy
+tắc này. Nếu tải tài khoản thất bại, nút xuất bị khóa và hiển thị lỗi để thử lại.
+Chế độ dùng trên máy không đăng nhập cũng dùng thông tin Danh Minh Hiếu.
+
 ## Lưu ý bảo mật
 
 Google Sheet phù hợp với ứng dụng cá nhân hoặc quy mô nhỏ, nhưng không nên xem là cơ sở dữ liệu có phân quyền mạnh. Hạn chế chia sẻ sheet, không đưa các biến trong `.env.local` lên Git, và nên sao lưu sheet định kỳ. Nếu cần nhiều gia sư, phân quyền theo người dùng hoặc dữ liệu nhạy cảm hơn, nên chuyển phần đăng nhập sang dịch vụ xác thực và database chuyên dụng.

@@ -5,7 +5,7 @@ const SYNC_SECRET_PROPERTY = "TUTOR_SYNC_SECRET";
 // lets the script read the old single-account tables and migrate them safely.
 const TABLES = {
   meta: { name: "App_Meta", headers: ["key", "value"] },
-  users: { name: "App_Users", headers: ["id", "username", "passwordHash", "passwordSalt", "createdAt", "updatedAt"] },
+  users: { name: "App_Users", headers: ["id", "username", "passwordHash", "passwordSalt", "createdAt", "updatedAt", "bankName", "bankAccountName", "bankAccountNumber", "bankQrImage"] },
   subjects: { name: "App_Subjects", headers: ["id", "name", "active", "createdAt", "updatedAt", "userId"] },
   students: { name: "App_Students", headers: ["id", "name", "phone", "parentName", "parentPhone", "note", "active", "createdAt", "updatedAt", "userId"] },
   studentSubjects: { name: "App_StudentSubjects", headers: ["id", "studentId", "subjectId", "defaultFee", "defaultDurationMinutes", "active", "createdAt", "updatedAt", "userId"] },
@@ -74,6 +74,7 @@ function requiredUserId_(payload) {
 
 function createUser_(user) {
   if (!user || !user.id || !user.username || !user.passwordHash || !user.passwordSalt) throw new Error("Tài khoản không hợp lệ.");
+  user = Object.assign({}, user, bankAccountForUsername_(user.username));
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -124,6 +125,38 @@ function authorize_(providedSecret) {
 
 function testConnection() {
   return spreadsheet_().getName();
+}
+
+function bankAccountForUsername_(username) {
+  return String(username || "").trim().toLowerCase() === "khadang2004cm@gmail.com"
+    ? { bankName: "MB BANK", bankAccountName: "DANG VU KHA", bankAccountNumber: "20402023979", bankQrImage: "/dang-vu-kha-qr.png" }
+    : { bankName: "TECHCOMBANK", bankAccountName: "DANH MINH HIEU", bankAccountNumber: "8804040202", bankQrImage: "/danh-minh-hieu-qr.png" };
+}
+
+// Apply the designated-email payment rule to existing accounts, changing only G:J.
+function setupBankAccounts() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = spreadsheet_().getSheetByName(TABLES.users.name);
+    if (!sheet) throw new Error("Chưa có bảng App_Users.");
+    const headers = TABLES.users.headers.slice(6);
+    const existing = sheet.getRange(1, 7, 1, 4).getValues()[0];
+    if (existing.some((value, index) => value && value !== headers[index])) throw new Error("Cột G:J đang chứa dữ liệu khác. Vui lòng kiểm tra trước khi cấu hình.");
+    sheet.getRange(1, 7, 1, 4).setValues([headers]);
+    sheet.getRange(2, 7, Math.max(sheet.getMaxRows() - 1, 1), 4).setNumberFormat("@");
+    if (sheet.getLastRow() < 2) return;
+    const usernames = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
+    usernames.forEach((row, index) => {
+      if (!String(row[0]).trim()) return;
+      const config = bankAccountForUsername_(row[0]);
+      const range = sheet.getRange(index + 2, 7, 1, 4);
+      range.setValues([headers.map((header) => config[header])]);
+    });
+    sheet.autoResizeColumns(7, 4);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function spreadsheet_() {
@@ -209,6 +242,7 @@ function writeTable_(table, records) {
   const sheet = spreadsheet_().getSheetByName(table.name) || spreadsheet_().insertSheet(table.name);
   sheet.clearContents();
   const rows = [table.headers].concat((records || []).map((record) => table.headers.map((header) => record[header] === undefined ? "" : record[header])));
+  if (table === TABLES.users && rows.length > 1) sheet.getRange(2, 7, rows.length - 1, 4).setNumberFormat("@");
   sheet.getRange(1, 1, rows.length, table.headers.length).setValues(rows);
   sheet.setFrozenRows(1);
 }

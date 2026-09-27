@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, LoaderCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { AppData, NoticeType } from "@/lib/types";
+import { AppData, AuthUser, NoticeType } from "@/lib/types";
 import { createReceiptPng, exportReceiptPng } from "@/lib/receipt-export";
+import { localReceiptPayment, ReceiptPayment } from "@/lib/receipt-payment";
 import { formatCurrency, getMonthlySummary, minutesLabel, monthLabel, slugify } from "@/lib/utils";
 
-export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppData; target: { studentId: string; month: string }; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void }) {
+export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }: { data: AppData; currentUser: AuthUser | null; target: { studentId: string; month: string }; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void }) {
+  const [payment, setPayment] = useState<ReceiptPayment | null | undefined>(currentUser ? undefined : localReceiptPayment);
+  const [paymentError, setPaymentError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [isPreparingPng, setIsPreparingPng] = useState(true);
   const [receiptPng, setReceiptPng] = useState<Blob | null>(null);
@@ -17,6 +20,29 @@ export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppD
   const summary = getMonthlySummary(data, target.month, target.studentId)[0];
   const student = data.students.find((item) => item.id === target.studentId);
   useEffect(() => {
+    if (!currentUser) {
+      setPayment(localReceiptPayment);
+      return;
+    }
+    const controller = new AbortController();
+    setPayment(undefined);
+    setPaymentError("");
+    void fetch("/api/payment", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.message || "Không thể tải thông tin chuyển khoản.");
+        if (!controller.signal.aborted) setPayment(body.payment ?? null);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setPaymentError(error instanceof Error ? error.message : "Không thể tải thông tin chuyển khoản.");
+        setIsPreparingPng(false);
+      });
+    return () => controller.abort();
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (payment === undefined) return;
     const element = receiptRef.current;
     if (!summary || !student || !element) {
       setIsPreparingPng(false);
@@ -37,7 +63,7 @@ export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppD
     });
 
     return () => { cancelled = true; };
-  }, [data, target.month, target.studentId]);
+  }, [data, target.month, target.studentId, payment]);
 
   const exportPng = () => {
     if (!summary || !student || !receiptPng || isExporting || isPreparingPng) return;
@@ -65,6 +91,8 @@ export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppD
       <button className="primary-button small-button" onClick={exportPng} disabled={isExporting || isPreparingPng || !receiptPng} aria-busy={isExporting || isPreparingPng}>{isExporting || isPreparingPng ? <LoaderCircle size={16} className="animate-spin" /> : <Download size={16} />} {isPreparingPng ? "Đang chuẩn bị…" : isExporting ? "Đang xuất…" : "Xuất PNG"}</button>
     </div>
     <div className="receipt-scroll">
+      {paymentError && <p role="alert">{paymentError}</p>}
+      {payment === null && <p role="status">Tài khoản chưa có đầy đủ thông tin chuyển khoản. Phiếu xuất sẽ không có mã QR.</p>}
       <div ref={receiptRef} className="receipt-card">
         <div className="receipt-top-decoration"><span /><span /><span /></div>
         <div className="receipt-heading-row">
@@ -78,11 +106,11 @@ export function ReceiptPreview({ data, target, onClose, onNotice }: { data: AppD
         </div>
         <div className="receipt-total"><span>TỔNG CỘNG</span><strong>{formatCurrency(summary.totalFee).replace(" ₫", "đ")}</strong></div>
         <div className="receipt-dates"><span>NGÀY ĐÃ HỌC</span><div className="receipt-date-badges">{summary.lessonDates.map((date) => { const [, month, day] = date.split("-"); return <Badge variant="secondary" key={date}>{day}/{month}</Badge>; })}</div></div>
-        <div className="receipt-qr">
+        {payment && <div className="receipt-qr">
           <span className="receipt-qr-label">THANH TOÁN CHUYỂN KHOẢN</span>
-          <img src="/payment-qr.jpg" width={640} height={720} alt="Mã QR chuyển khoản Techcombank" />
-          <div className="receipt-payment-info"><strong>TECHCOMBANK</strong><small>DANH MINH HIEU</small><b>8804 0402 02</b><em>Quét mã để chuyển khoản</em></div>
-        </div>
+          <img src={payment.qrSrc} width={1000} height={1000} alt={`Mã QR chuyển khoản ${payment.bank} - ${payment.accountName}`} />
+          <div className="receipt-payment-info"><strong>{payment.bank}</strong><small>{payment.accountName}</small><b>{payment.accountNumber}</b><em>Quét mã để chuyển khoản</em></div>
+        </div>}
         <div className="receipt-footer"><span>Cảm ơn bạn đã đồng hành cùng lớp học ✦</span><small>Được tạo từ Sổ học phí</small></div>
       </div>
     </div>
