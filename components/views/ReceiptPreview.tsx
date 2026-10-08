@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { AppData, AuthUser, NoticeType } from "@/lib/types";
 import { createReceiptPng, exportReceiptPng } from "@/lib/receipt-export";
 import { localReceiptPayment, ReceiptPayment } from "@/lib/receipt-payment";
-import { formatCurrency, getMonthlySummary, minutesLabel, monthLabel, slugify } from "@/lib/utils";
+import { formatCurrency, getMonthlySummaryForMonths, minutesLabel, monthLabel, monthSelectionLabel, slugify } from "@/lib/utils";
 
-export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }: { data: AppData; currentUser: AuthUser | null; target: { studentId: string; month: string }; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void }) {
+export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }: { data: AppData; currentUser: AuthUser | null; target: { studentId: string; months: string[] }; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void }) {
   const [payment, setPayment] = useState<ReceiptPayment | null | undefined>(currentUser ? undefined : localReceiptPayment);
   const [paymentError, setPaymentError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
@@ -17,7 +17,11 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
   const receiptRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef(onNotice);
   noticeRef.current = onNotice;
-  const summary = getMonthlySummary(data, target.month, target.studentId)[0];
+  const summary = getMonthlySummaryForMonths(data, target.months, target.studentId)[0];
+  const monthsKey = target.months.join("_");
+  const fileMonths = target.months.length <= 4 ? monthsKey : `${target.months[0]}-${target.months.length}-thang`;
+  const monthsLabel = target.months.map(monthLabel).join(" · ");
+  const years = new Set(target.months.map((month) => month.slice(0, 4)));
   const student = data.students.find((item) => item.id === target.studentId);
   useEffect(() => {
     if (!currentUser) {
@@ -63,7 +67,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
     });
 
     return () => { cancelled = true; };
-  }, [data, target.month, target.studentId, payment]);
+  }, [data, monthsKey, target.studentId, payment]);
 
   const exportPng = () => {
     if (!summary || !student || !receiptPng || isExporting || isPreparingPng) return;
@@ -71,7 +75,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
     try {
       const method = exportReceiptPng(
         receiptPng,
-        `hoc-phi-${slugify(student.name)}-${target.month}.png`,
+        `hoc-phi-${slugify(student.name)}-${fileMonths}.png`,
         () => onNotice("Không mở được bảng chia sẻ. Vui lòng nhấn xuất ảnh để thử lại.", "error"),
       );
       if (method === "shared") onNotice("Chọn “Lưu hình ảnh” trong bảng chia sẻ để lưu phiếu.");
@@ -97,7 +101,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
         <div className="receipt-top-decoration"><span /><span /><span /></div>
         <div className="receipt-heading-row">
           <div className="receipt-brand"><span className="brand-mark brand-image"><img src="/app-logo.png" width={1254} height={1254} alt="Logo Sổ học phí" /></span><div><strong>SỔ HỌC PHÍ</strong><small>TRỢ LÝ GIA SƯ</small></div></div>
-          <div className="receipt-title"><span>PHIẾU HỌC PHÍ</span><h2>{monthLabel(target.month)}</h2></div>
+          <div className="receipt-title"><span>PHIẾU HỌC PHÍ</span><h2>{monthSelectionLabel(target.months)}</h2>{target.months.length > 2 && <small className="receipt-period">{monthsLabel}</small>}</div>
         </div>
         <div className="receipt-student"><div><span>HỌC SINH</span><strong>{student.name}</strong></div>{student.parentName && <small>Phụ huynh: {student.parentName}</small>}</div>
         <div className="receipt-lines">
@@ -105,7 +109,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
           {summary.subjects.map((subject) => <div className="receipt-line" key={subject.subjectId}><div><div className="receipt-subject-heading"><strong>{subject.subjectName}</strong><Badge variant="secondary" className="receipt-count-badge">{subject.lessonCount} buổi</Badge></div><small>{minutesLabel(subject.totalDurationMinutes)}</small></div><strong>{formatCurrency(subject.totalFee).replace(" ₫", "đ")}</strong></div>)}
         </div>
         <div className="receipt-total"><span>TỔNG CỘNG</span><strong>{formatCurrency(summary.totalFee).replace(" ₫", "đ")}</strong></div>
-        <div className="receipt-dates"><span>NGÀY ĐÃ HỌC</span><div className="receipt-date-badges">{summary.lessonDates.map((date) => { const [, month, day] = date.split("-"); return <Badge variant="secondary" key={date}>{day}/{month}</Badge>; })}</div></div>
+        <div className="receipt-dates"><span>NGÀY ĐÃ HỌC</span><div className="receipt-date-badges">{summary.lessonDates.map((date) => { const [year, month, day] = date.split("-"); return <Badge variant="secondary" key={date}>{day}/{month}{years.size > 1 ? `/${year}` : ""}</Badge>; })}</div></div>
         {payment && <div className="receipt-qr">
           <span className="receipt-qr-label">THANH TOÁN CHUYỂN KHOẢN</span>
           <img src={payment.qrSrc} width={1000} height={1000} alt={`Mã QR chuyển khoản ${payment.bank} - ${payment.accountName}`} />

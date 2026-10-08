@@ -14,12 +14,13 @@ export function useAppStore(accountId: string | null) {
   const [hydrated, setHydrated] = useState(false);
   const [view, setView] = useState<View>("home");
   const [month, setMonth] = useState(currentMonth());
+  const [months, setMonths] = useState([currentMonth()]);
   const [search, setSearch] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [lessonModal, setLessonModal] = useState<Lesson | "new" | null>(null);
   const [studentModal, setStudentModal] = useState<Student | "new" | null>(null);
   const [subjectModal, setSubjectModal] = useState<Subject | "new" | null>(null);
-  const [receiptTarget, setReceiptTarget] = useState<{ studentId: string; month: string } | null>(null);
+  const [receiptTarget, setReceiptTarget] = useState<{ studentId: string; months: string[] } | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [storageStatus, setStorageStatus] = useState<"checking" | "local" | "cloud" | "syncing" | "error">("checking");
   const [confirmDelete, setConfirmDelete] = useState<Lesson | null>(null);
@@ -277,8 +278,14 @@ export function useAppStore(accountId: string | null) {
     notify("Đã lưu tiêu đề thời khóa biểu.");
   };
 
+  const setSelectedMonths = (selected: string[]) => {
+    const normalized = [...new Set(selected)].sort();
+    setMonths(normalized);
+    if (normalized.length) setMonth(normalized[normalized.length - 1]);
+  };
+
   return {
-    data, hydrated, view, setView, month, setMonth, search, setSearch,
+    data, hydrated, view, setView, month, setMonth, months, setMonths: setSelectedMonths, search, setSearch,
     selectedStudentId, setSelectedStudentId,
     lessonModal, setLessonModal, studentModal, setStudentModal, studentDraft, setStudentDraft,
     subjectModal, setSubjectModal, subjectName, setSubjectName,

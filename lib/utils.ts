@@ -43,6 +43,13 @@ export function monthLabel(month: string) {
   return `Tháng ${Number(monthNumber)} / ${year}`;
 }
 
+export function monthSelectionLabel(months: string[]) {
+  if (!months.length) return "Chưa chọn tháng";
+  if (months.length === 1) return monthLabel(months[0]);
+  if (months.length === 2) return months.map(monthLabel).join(", ");
+  return `${months.length} tháng được chọn`;
+}
+
 export function minutesLabel(minutes: number) {
   const safeMinutes = Number.isFinite(minutes) ? Math.max(0, minutes) : 0;
   if (safeMinutes < 60) return `${safeMinutes} phút`;
@@ -52,7 +59,16 @@ export function minutesLabel(minutes: number) {
 }
 
 export function getMonthlySummary(data: AppData, month: string, studentId?: string): MonthlyStudentSummary[] {
-  const lessons = data.lessons.filter((lesson) => lesson.lessonDate.startsWith(month) && (!studentId || lesson.studentId === studentId));
+  return summarizeLessons(data, data.lessons.filter((lesson) => lesson.lessonDate.startsWith(month) && (!studentId || lesson.studentId === studentId)), month);
+}
+
+export function getMonthlySummaryForMonths(data: AppData, months: string[], studentId?: string): MonthlyStudentSummary[] {
+  const selectedMonths = new Set(months);
+  const lessons = data.lessons.filter((lesson) => selectedMonths.has(lesson.lessonDate.slice(0, 7)) && (!studentId || lesson.studentId === studentId));
+  return summarizeLessons(data, lessons, months[0] ?? "");
+}
+
+function summarizeLessons(data: AppData, lessons: Lesson[], month: string): MonthlyStudentSummary[] {
   const grouped = new Map<string, Lesson[]>();
   lessons.forEach((lesson) => grouped.set(lesson.studentId, [...(grouped.get(lesson.studentId) ?? []), lesson]));
   return [...grouped.entries()].map(([id, studentLessons]) => {

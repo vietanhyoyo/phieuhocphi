@@ -82,7 +82,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .home-month-summary { display: flex; flex-direction: column; gap: 11px; }
 .home-month-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .home-month-heading > div:first-child { min-width: 0; }
-.home-month-heading strong { display: block; margin-top: 3px; color: #293f54; font-family: 'Roboto', sans-serif; font-size: 15px; }
+.home-month-heading strong { display: block; overflow: hidden; margin-top: 3px; color: #293f54; font-family: 'Roboto', sans-serif; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
 .home-month-picker { width: 156px; flex: 0 0 auto; }
 .home-month-picker .date-picker-trigger { min-height: 38px; padding: 0 10px; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; color: #475569; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
 .stat-card { display: grid; grid-template-columns: 31px 1fr; grid-template-rows: 24px 17px; column-gap: 10px; align-items: center; padding: 14px 12px; border: 1px solid var(--line); border-radius: 17px; background: #fff; }
@@ -189,6 +189,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .month-grid button { min-height: 34px; color: #5b7887; border: 1px solid #edf1f3; border-radius: 9px; background: #fbfcfd; font-size: 10px; }
 .month-grid button:hover { color: #176d89; border-color: #c9e7ee; background: #f0fafb; }
 .month-grid button.selected { color: #fff; border-color: var(--primary); background: var(--primary); }
+.multi-month-picker-popover { width: min(286px, calc(100vw - 24px)); }
+.multi-month-picker-popover .month-grid button { min-height: 36px; }
+.multi-month-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; color: #718797; font-size: 10px; }
+.multi-month-footer button { min-height: 29px; padding: 0 12px; color: #fff; border-radius: 8px; background: var(--primary); font-size: 10px; font-weight: 800; }
+.multi-month-selection { overflow: hidden; margin-top: 6px; color: #99a9b1; font-size: 9px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .filter-note { display: inline-flex; align-items: center; gap: 4px; color: #9aaab3; font-size: 10px; white-space: nowrap; }
 .full-list { gap: 9px; }
 .student-list { display: flex; flex-direction: column; gap: 9px; }
@@ -238,7 +243,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .count-label { color: #9baab2; font-size: 10px; }
 .month-banner { display: flex; align-items: center; justify-content: space-between; padding: 15px 16px; border: 1px solid #dbeafe; border-radius: 20px; background: linear-gradient(135deg, #f8faff, #eef2ff); box-shadow: 0 8px 24px rgba(79,70,229,.05); }
 .month-banner > div > span { display: block; color: #79a1ad; font-size: 8px; font-weight: 800; letter-spacing: .13em; }
-.month-banner strong { display: block; margin-top: 3px; color: #3730a3; font-family: 'Roboto', sans-serif; font-size: 17px; }
+.month-banner > div:first-child { min-width: 0; flex: 1; }
+.month-banner strong { display: block; overflow: hidden; max-width: 100%; margin-top: 3px; color: #3730a3; font-family: 'Roboto', sans-serif; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
 .month-control.light { max-width: 38px; overflow: visible; padding: 0; justify-content: center; color: #3a8fa6; border: 0; background: rgba(255,255,255,.64); }
 .month-control.light .date-picker { width: 38px; }
 .month-control.light .date-picker-trigger { width: 38px; min-height: 38px; justify-content: center; padding: 0; color: #3a8fa6; border-radius: 10px; }
@@ -394,7 +400,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .receipt-brand small { color: #647e88; font-size: 9px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
 .receipt-title { margin: 0; text-align: right; }
 .receipt-title span { color: #647e88; font-size: 10px; font-weight: 800; letter-spacing: .18em; }
-.receipt-title h2 { white-space: nowrap; margin: 2px 0 0; color: #1d647e; font-family: 'Roboto', sans-serif; font-size: 17px; letter-spacing: -.04em; }
+.receipt-title h2 { white-space: normal; margin: 2px 0 0; color: #1d647e; font-family: 'Roboto', sans-serif; font-size: 17px; letter-spacing: -.04em; }
+.receipt-title { max-width: 190px; flex: 0 1 auto; }
+.receipt-period { display: block; margin-top: 3px; color: #6f8791; font-size: 8px; line-height: 1.4; }
 .receipt-student { display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 5px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #f3fafb; }
 .receipt-student > div { min-width: 0; display: flex; align-items: baseline; gap: 7px; }
 .receipt-student span { flex-shrink: 0; }

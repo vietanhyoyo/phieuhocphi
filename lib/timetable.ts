@@ -4,10 +4,18 @@ export const WEEKDAYS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", 
 export const TIMETABLE_COLORS = [
   { value: "#fef08a", label: "Vàng" },
   { value: "#fdba74", label: "Cam" },
-  { value: "#67e8f9", label: "Xanh dương" },
-  { value: "#bbf7d0", label: "Xanh lá" },
-  { value: "#ddd6fe", label: "Tím" },
+  { value: "#fca5a5", label: "Đỏ" },
   { value: "#fbcfe8", label: "Hồng" },
+  { value: "#f0abfc", label: "Hồng đậm" },
+  { value: "#ddd6fe", label: "Tím" },
+  { value: "#67e8f9", label: "Xanh dương" },
+  { value: "#93c5fd", label: "Xanh biển" },
+  { value: "#5eead4", label: "Xanh ngọc" },
+  { value: "#bbf7d0", label: "Xanh lá" },
+  { value: "#bef264", label: "Chanh" },
+  { value: "#a5f3fc", label: "Bạc hà" },
+  { value: "#fde68a", label: "Nâu nhạt" },
+  { value: "#d1d5db", label: "Xám" },
 ];
 export const isTime = (value: unknown): value is string => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
