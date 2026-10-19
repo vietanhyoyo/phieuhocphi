@@ -5,12 +5,16 @@ import { Card } from "@/components/ui/card";
 import { LessonRow } from "@/components/shared/LessonRow";
 import { VietnameseMultiMonthPicker } from "@/components/shared/VietnameseMultiMonthPicker";
 import { AppData } from "@/lib/types";
-import { formatCurrency, monthSelectionLabel, sortLessonsNewestFirst } from "@/lib/utils";
+import { formatCurrency, getMonthlySummaryForMonths, monthSelectionLabel, sortLessonsNewestFirst } from "@/lib/utils";
 
 export function HomeView({ data, months, setMonths, onRecord, onStudent, onViewLessons }: { data: AppData; months: string[]; setMonths: (months: string[]) => void; onRecord: () => void; onStudent: (id: string) => void; onViewLessons: () => void }) {
   const selectedMonths = new Set(months);
   const monthLessons = data.lessons.filter((lesson) => selectedMonths.has(lesson.lessonDate.slice(0, 7)));
   const monthTotal = monthLessons.reduce((sum, lesson) => sum + lesson.fee, 0);
+  const studentSummaries = new Map(getMonthlySummaryForMonths(data, months).map((summary) => [summary.studentId, summary]));
+  const studentStats = data.students
+    .map((student) => ({ student, summary: studentSummaries.get(student.id) }))
+    .sort((a, b) => (b.summary?.totalFee ?? 0) - (a.summary?.totalFee ?? 0) || a.student.name.localeCompare(b.student.name, "vi"));
   const recentStudentIds = [...new Set([...data.lessons].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((lesson) => lesson.studentId))].slice(0, 4);
   const greeting = new Date().getHours() < 12 ? "Chào buổi sáng" : new Date().getHours() < 18 ? "Chào buổi chiều" : "Chào buổi tối";
   return <div className="view-stack">
@@ -25,6 +29,22 @@ export function HomeView({ data, months, setMonths, onRecord, onStudent, onViewL
         <Card className="stat-card"><span className="stat-icon blue"><NotebookPen size={17} /></span><strong>{monthLessons.length}</strong><span>Buổi trong kỳ đã chọn</span></Card>
         <Card className="stat-card"><span className="stat-icon amber"><CircleDollarSign size={17} /></span><strong>{formatCurrency(monthTotal).replace(" ₫", "đ")}</strong><span>Học phí trong kỳ</span></Card>
       </div>
+    </section>
+    <section className="section-block">
+      <div className="section-heading"><div><span className="section-kicker">THỐNG KÊ THEO HỌC SINH</span><h3>Buổi dạy và học phí</h3></div></div>
+      <Card className="home-student-stats-card">
+        <div className="home-student-stats-caption">{monthSelectionLabel(months)} · {studentStats.length} học sinh</div>
+        {studentStats.length ? <div className="home-student-stats-scroll">
+          <table className="home-student-stats-table" aria-label={`Thống kê buổi dạy và học phí ${monthSelectionLabel(months)}`}>
+            <thead><tr><th scope="col">Học sinh</th><th scope="col">Số buổi</th><th scope="col">Học phí</th></tr></thead>
+            <tbody>{studentStats.map(({ student, summary }) => <tr key={student.id}>
+              <td><span className="home-student-stats-name"><span className="avatar small">{student.name.charAt(0)}</span><span>{student.name}</span></span></td>
+              <td>{summary?.totalLessonCount ?? 0}</td>
+              <td>{formatCurrency(summary?.totalFee ?? 0).replace(" ₫", "đ")}</td>
+            </tr>)}</tbody>
+          </table>
+        </div> : <p className="home-student-stats-empty">Thêm học sinh để xem thống kê theo từng em.</p>}
+      </Card>
     </section>
     <section className="section-block">
       <div className="section-heading"><div><span className="section-kicker">LỐI TẮT</span><h3>Học sinh gần đây</h3></div>{data.students.length > 4 && <button className="text-button" onClick={() => onViewLessons()}>Xem tất cả <ChevronRight size={15} /></button>}</div>

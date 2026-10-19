@@ -99,6 +99,23 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .student-chips::-webkit-scrollbar { display: none; }
 .student-chip { min-width: max-content; height: 45px; display: inline-flex; align-items: center; gap: 8px; padding: 0 10px 0 6px; color: #345367; border: 1px solid var(--line); border-radius: 14px; background: #fff; font-size: 11px; font-weight: 700; box-shadow: 0 3px 12px rgba(30, 66, 85, .035); }
 .student-chip > svg { color: #8aa0ac; }
+.home-student-stats-card { overflow: hidden; padding: 0; border-color: var(--line); border-radius: 17px; }
+.home-student-stats-caption { padding: 11px 13px 9px; color: #8ca0ad; font-size: 9px; font-weight: 700; }
+.home-student-stats-scroll { max-width: 100%; overflow-x: auto; }
+.home-student-stats-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.home-student-stats-table th, .home-student-stats-table td { padding: 9px 12px; border-top: 1px solid #edf1f3; }
+.home-student-stats-table th { color: #8496a2; background: #f8fafc; font-size: 9px; font-weight: 800; text-align: left; }
+.home-student-stats-table th:first-child { width: 52%; }
+.home-student-stats-table th:nth-child(2) { width: 20%; }
+.home-student-stats-table th:nth-child(3) { width: 28%; }
+.home-student-stats-table th:nth-child(n + 2), .home-student-stats-table td:nth-child(n + 2) { text-align: right; }
+.home-student-stats-table td { color: #496577; font-size: 10px; font-weight: 700; }
+.home-student-stats-table td:nth-child(2) { color: #718697; font-variant-numeric: tabular-nums; }
+.home-student-stats-table td:nth-child(3) { color: #1a6b8a; white-space: nowrap; }
+.home-student-stats-name { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.home-student-stats-name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-student-stats-name .avatar.small { width: 28px; height: 28px; border-radius: 9px; font-size: 11px; }
+.home-student-stats-empty { margin: 0; padding: 12px 13px 14px; border-top: 1px solid #edf1f3; color: #8ca0aa; font-size: 10px; }
 .avatar { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 13px; color: #4338ca; background: linear-gradient(145deg, #e0e7ff, #c7d2fe); font-family: 'Roboto', sans-serif; font-size: 15px; font-weight: 700; }
 .avatar.small { width: 30px; height: 30px; border-radius: 10px; font-size: 12px; }
 .avatar.large { width: 60px; height: 60px; border-radius: 19px; font-size: 23px; }
