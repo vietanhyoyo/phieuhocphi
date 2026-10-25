@@ -8,10 +8,11 @@ import { createReceiptPng, exportReceiptPng } from "@/lib/receipt-export";
 import { localReceiptPayment, ReceiptPayment } from "@/lib/receipt-payment";
 import { formatCurrency, getMonthlySummaryForMonths, getReceiptPaymentProgress, minutesLabel, monthLabel, monthSelectionLabel, slugify } from "@/lib/utils";
 
-export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, onSetPaid }: { data: AppData; currentUser: AuthUser | null; target: ReceiptTarget; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void; onSetPaid: (target: ReceiptTarget, paid: boolean) => void }) {
+export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, onSetPaid, isStorageChecking }: { data: AppData; currentUser: AuthUser | null; target: ReceiptTarget; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void; onSetPaid: (target: ReceiptTarget, paid: boolean) => Promise<boolean>; isStorageChecking: boolean }) {
   const [payment, setPayment] = useState<ReceiptPayment | null | undefined>(currentUser ? undefined : localReceiptPayment);
   const [paymentError, setPaymentError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
   const [isPreparingPng, setIsPreparingPng] = useState(true);
   const [receiptPng, setReceiptPng] = useState<Blob | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -89,10 +90,18 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, o
       setIsExporting(false);
     }
   };
-  const updatePayment = () => {
+  const updatePayment = async () => {
+    if (isUpdatingPayment) return;
+    setIsUpdatingPayment(true);
     setReceiptPng(null);
     setIsPreparingPng(true);
-    onSetPaid(target, !allPaid);
+    try {
+      await onSetPaid(target, !allPaid);
+    } catch {
+      onNotice("Không thể đồng bộ trạng thái học phí. Vui lòng thử lại.", "error");
+    } finally {
+      setIsUpdatingPayment(false);
+    }
   };
   if (!summary || !student) return null;
   return <div className="receipt-screen">
@@ -106,7 +115,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, o
       {payment === null && <p role="status">Tài khoản chưa có đầy đủ thông tin chuyển khoản. Phiếu xuất sẽ không có mã QR.</p>}
       <div className="receipt-payment-control">
         <div><span>TRẠNG THÁI HỌC PHÍ</span><strong>{paymentStatus}</strong><small>{totalCount} buổi trong phiếu · {formatCurrency(summary.totalFee).replace(" ₫", "đ")}</small></div>
-        <button type="button" className={allPaid ? "receipt-payment-undo" : "receipt-payment-confirm"} onClick={updatePayment}>{allPaid ? "Chuyển về chưa thu" : "Xác nhận đã thu tiền"}</button>
+        <button type="button" className={allPaid ? "receipt-payment-undo" : "receipt-payment-confirm"} onClick={updatePayment} disabled={isUpdatingPayment || isStorageChecking} aria-busy={isUpdatingPayment || isStorageChecking}>{(isUpdatingPayment || isStorageChecking) && <LoaderCircle size={15} className="animate-spin" />}{isStorageChecking ? "Đang tải dữ liệu…" : isUpdatingPayment ? "Đang đồng bộ…" : allPaid ? "Chuyển về chưa thu" : "Xác nhận đã thu tiền"}</button>
       </div>
       <div ref={receiptRef} className="receipt-card">
         <div className="receipt-top-decoration"><span /><span /><span /></div>

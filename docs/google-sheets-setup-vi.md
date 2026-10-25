@@ -57,6 +57,18 @@ Nếu sheet chưa có dữ liệu, dữ liệu hiện có trong localStorage s�
 
 Các tab dữ liệu có thêm cột `userId`. Khi tài khoản đăng nhập, Apps Script chỉ tải và cập nhật các dòng có đúng `userId` đó; học sinh, môn học, buổi dạy và học phí giữa các tài khoản không bị trộn lẫn. Dữ liệu cũ chưa có `userId` sẽ được gán cho tài khoản đầu tiên khi Sheet vẫn chỉ có một tài khoản.
 
+## Trạng thái thu học phí
+
+Tab `App_Lessons` có cột L tên `paid`, nằm sau `userId`. Giá trị `TRUE` nghĩa là
+đã thu học phí của buổi dạy, `FALSE` nghĩa là chưa thu. Những buổi cũ không có
+giá trị `paid` được ứng dụng hiểu là chưa thu. Khi xác nhận thu tiền trên phiếu
+học phí, ứng dụng cập nhật các buổi của học sinh trong những tháng đã chọn rồi
+đồng bộ trạng thái này lên Sheet.
+
+Sau khi sửa `google-apps-script/Code.gs`, cập nhật **bản triển khai Web App hiện
+có** bằng phiên bản mới để giữ nguyên URL `/exec`. Mã mới tự thêm cột `paid` ở
+lần ghi dữ liệu tiếp theo; không cần tạo lại tab `App_Lessons`.
+
 ## Thông tin chuyển khoản theo tài khoản
 
 Tab `App_Users` giữ các cột A:F hiện tại và bổ sung bốn cột G:J:

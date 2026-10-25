@@ -61,25 +61,29 @@ export function useAppStore(accountId: string | null) {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const queueRemoteSave = (next: AppData, ownerId: string | null = accountId) => {
-    if (!ownerId || !cloudEnabledRef.current) return;
-    saveQueueRef.current = saveQueueRef.current
+  const queueRemoteSave = (next: AppData, ownerId: string | null = accountId): Promise<boolean | null> => {
+    if (!ownerId || !cloudEnabledRef.current) return Promise.resolve(null);
+    const saveTask = saveQueueRef.current
       .then(async () => {
-        if (ownerId !== activeAccountRef.current) return;
+        if (ownerId !== activeAccountRef.current) return false;
         setStorageStatus("syncing");
         await saveRemoteData(next);
-        if (ownerId !== activeAccountRef.current) return;
+        if (ownerId !== activeAccountRef.current) return false;
         setStorageStatus("cloud");
         syncErrorShownRef.current = false;
+        return true;
       })
       .catch(() => {
-        if (ownerId !== activeAccountRef.current) return;
+        if (ownerId !== activeAccountRef.current) return false;
         setStorageStatus("error");
         if (!syncErrorShownRef.current) {
           syncErrorShownRef.current = true;
           setNotice({ message: "Đã lưu tạm trên thiết bị nhưng chưa đồng bộ được với Google Sheet.", type: "error" });
         }
+        return false;
       });
+    saveQueueRef.current = saveTask.then(() => undefined);
+    return saveTask;
   };
 
   const refreshRemoteData = async (fallbackData = latestDataRef.current, ownerId: string | null = accountId) => {
@@ -115,7 +119,7 @@ export function useAppStore(accountId: string | null) {
     latestDataRef.current = normalized;
     setData(normalized);
     saveData(normalized, storageScope);
-    queueRemoteSave(normalized, accountId);
+    return queueRemoteSave(normalized, accountId);
   };
 
   const notify = (message: string, type: NoticeType = "success") => setNotice({ message, type });
@@ -225,12 +229,16 @@ export function useAppStore(accountId: string | null) {
     notify(exists ? "Đã cập nhật buổi dạy." : "Đã lưu buổi dạy vào sổ.");
   };
 
-  const setReceiptPaid = (target: ReceiptTarget, paid: boolean) => {
+  const setReceiptPaid = async (target: ReceiptTarget, paid: boolean): Promise<boolean> => {
     const current = latestDataRef.current;
-    if (!getReceiptLessons(current, target).length) return;
+    if (!getReceiptLessons(current, target).length) return false;
     const timestamp = new Date().toISOString();
-    updateData(updateReceiptLessonsPaid(current, target, paid, timestamp));
-    notify(paid ? "Đã ghi nhận thu học phí cho phiếu này." : "Đã chuyển học phí của phiếu này về chưa thu.");
+    const syncResult = await updateData(updateReceiptLessonsPaid(current, target, paid, timestamp));
+    if (syncResult === false) return false;
+    notify(syncResult === null
+      ? (paid ? "Đã cập nhật trạng thái thu tiền trên thiết bị." : "Đã cập nhật trạng thái học phí trên thiết bị.")
+      : (paid ? "Đã đồng bộ trạng thái thu tiền với Google Sheet." : "Đã đồng bộ trạng thái học phí với Google Sheet."));
+    return true;
   };
 
   const removeLesson = () => {
