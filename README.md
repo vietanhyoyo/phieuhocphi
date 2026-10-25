@@ -18,7 +18,7 @@ Mở [http://localhost:3000](http://localhost:3000).
 2. Triển khai Apps Script dưới dạng Web App, quyền truy cập **Anyone**.
 3. Điền URL triển khai, mã bí mật và `AUTH_SECRET` vào `.env.local`.
 
-Khi cập nhật `Code.gs`, hãy triển khai phiên bản Web App mới để các chức năng tài khoản, gồm đổi mật khẩu, hoạt động với mã mới.
+Khi cập nhật `Code.gs`, hãy triển khai phiên bản Web App mới để các thay đổi đồng bộ, gồm trạng thái đã thu học phí của buổi dạy, hoạt động với mã mới. Lần ghi dữ liệu tiếp theo sẽ tự thêm cột `paid` vào cuối bảng `App_Lessons`; các buổi cũ mặc định là chưa thu tiền.
 
 Xem hướng dẫn chi tiết tại [`docs/google-sheets-setup-vi.md`](./docs/google-sheets-setup-vi.md).
 

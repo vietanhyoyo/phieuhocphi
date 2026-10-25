@@ -137,6 +137,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .note-dot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: var(--amber); }
 .lesson-subline { display: flex; align-items: center; gap: 7px; margin-top: 8px; color: #64748b; font-size: 9px; white-space: nowrap; }
 .lesson-subline > span:last-child { display: inline-flex; align-items: center; gap: 3px; }
+.lesson-payment-status { width: fit-content; margin-top: 6px; padding: 2px 7px; font-size: 9px; }
 .subject-pill { padding: 3px 6px; color: #5a91a4; border-radius: 6px; background: #edf7f9; font-size: 9px; font-weight: 700; }
 .lesson-end { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto; }
 .lesson-end > strong { color: #3730a3; font-family: 'Roboto', sans-serif; font-size: 11px; white-space: nowrap; }
@@ -278,6 +279,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .tuition-card-top > div { flex: 1; }
 .tuition-card-top strong { display: block; color: #294c5e; font-size: 12px; }
 .tuition-card-top > div > span { display: block; margin-top: 4px; color: #96a5ad; font-size: 9px; }
+.tuition-card-top > div > span.tuition-paid-count { color: #64748b; font-size: 10px; font-weight: 700; }
+.tuition-card-top > div > span.tuition-paid-count.complete { color: #047857; }
 .tuition-card-top > svg { color: #a8b7bd; }
 .mini-breakdown { display: flex; flex-direction: column; gap: 8px; margin: 13px 0; padding: 11px 0; border-top: 1px solid #eef2f7; border-bottom: 1px solid #eef2f7; }
 .mini-breakdown > div, .tuition-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -287,6 +290,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .tuition-card-bottom > div { display: flex; flex-direction: column; gap: 2px; }
 .tuition-card-bottom > div > span { color: #94a3b8; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .tuition-card-bottom > div > strong { color: #3730a3; font-family: 'Roboto', sans-serif; font-size: 16px; }
+.tuition-paid-note { color: #047857; font-size: 9px; font-weight: 700; }
 .receipt-button { min-height: 30px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; color: #2d829c; border-radius: 9px; background: #eef8fa; font-size: 10px; font-weight: 800; }
 .settings-view { gap: 26px; }
 .settings-intro { padding: 8px 3px 0; }
@@ -404,6 +408,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .receipt-toolbar > div { display: flex; flex: 1; flex-direction: column; gap: 3px; }
 .receipt-toolbar strong { font-family: 'Roboto', sans-serif; font-size: 15px; }
 .receipt-scroll { padding: 10px 10px 18px; }
+.receipt-payment-control { width: min(100%, 390px); display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 auto 10px; padding: 11px 12px; border: 1px solid #dbe7ee; border-radius: 14px; background: #fff; }
+.receipt-payment-control > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.receipt-payment-control span { color: #718b98; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.receipt-payment-control strong { color: #284b5b; font-size: 13px; }
+.receipt-payment-control small { color: #718b98; font-size: 10px; }
+.receipt-payment-control button { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: 0 0 auto; padding: 0 10px; border-radius: 10px; font-size: 10px; font-weight: 800; }
+.receipt-payment-confirm { color: #fff; background: #059669; }
+.receipt-payment-undo { color: #475569; background: #f1f5f9; }
 .receipt-card { width: min(100%, 390px); margin: 0 auto; padding: 13px 14px 12px; color: #2b4a5b; background: #fff; border-radius: 16px; box-shadow: 0 12px 34px rgba(30, 70, 84, .1); }
 .receipt-top-decoration { display: flex; gap: 4px; height: 3px; margin: -13px -14px 11px; overflow: hidden; border-radius: 16px 16px 0 0; background: #dbf0f3; }
 .receipt-top-decoration span:first-child { width: 35%; background: #4f46e5; }
@@ -439,6 +451,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .receipt-total { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 9px; padding: 9px 0; border-top: 2px solid #2c8ca2; border-bottom: 1px solid #e6eef0; }
 .receipt-total span { color: #4f7c8b; font-size: 11px; font-weight: 800; letter-spacing: .1em; }
 .receipt-total strong { color: #176d89; font-family: 'Roboto', sans-serif; font-size: 23px; }
+.receipt-payment-state { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -2px 0 9px; color: #8a6670; font-size: 10px; font-weight: 800; }
+.receipt-payment-state span { font-size: 9px; letter-spacing: .07em; }
+.receipt-payment-state strong { padding: 4px 7px; border-radius: 7px; background: #fff1f2; font-size: 10px; }
+.receipt-payment-state.is-paid { color: #047857; }
+.receipt-payment-state.is-paid strong { background: #ecfdf5; }
 .receipt-dates { min-width: 0; padding: 9px; border-radius: 11px; background: #fbf7ec; }
 .receipt-date-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .receipt-date-badges > div { border: 0; padding: 3px 6px; color: #287d78; background: #e9f7f5; font-size: 10px; font-weight: 800; }

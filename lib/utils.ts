@@ -1,4 +1,4 @@
-import { AppData, Lesson, MonthlyStudentSummary, MonthlySubjectSummary, StudentDraft } from "./types";
+import { AppData, Lesson, MonthlyStudentSummary, MonthlySubjectSummary, ReceiptTarget, StudentDraft } from "./types";
 
 export function uid(prefix = "id") {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return `${prefix}-${crypto.randomUUID()}`;
@@ -68,6 +68,25 @@ export function getMonthlySummaryForMonths(data: AppData, months: string[], stud
   return summarizeLessons(data, lessons, months[0] ?? "");
 }
 
+export function getReceiptLessons(data: AppData, target: ReceiptTarget): Lesson[] {
+  const selectedMonths = new Set(target.months);
+  return data.lessons.filter((lesson) => lesson.studentId === target.studentId && selectedMonths.has(lesson.lessonDate.slice(0, 7)));
+}
+
+export function getReceiptPaymentProgress(data: AppData, target: ReceiptTarget) {
+  const lessons = getReceiptLessons(data, target);
+  const paidCount = lessons.filter((lesson) => lesson.paid).length;
+  return { totalCount: lessons.length, paidCount, allPaid: lessons.length > 0 && paidCount === lessons.length };
+}
+
+export function updateReceiptLessonsPaid(data: AppData, target: ReceiptTarget, paid: boolean, updatedAt: string): AppData {
+  const lessonIds = new Set(getReceiptLessons(data, target).map((lesson) => lesson.id));
+  return {
+    ...data,
+    lessons: data.lessons.map((lesson) => lessonIds.has(lesson.id) && lesson.paid !== paid ? { ...lesson, paid, updatedAt } : lesson),
+  };
+}
+
 function summarizeLessons(data: AppData, lessons: Lesson[], month: string): MonthlyStudentSummary[] {
   const grouped = new Map<string, Lesson[]>();
   lessons.forEach((lesson) => grouped.set(lesson.studentId, [...(grouped.get(lesson.studentId) ?? []), lesson]));
@@ -103,6 +122,20 @@ export function slugify(value: string) {
 
 export function sortLessonsNewestFirst(lessons: Lesson[]) {
   return [...lessons].sort((a, b) => `${b.lessonDate} ${b.startTime}`.localeCompare(`${a.lessonDate} ${a.startTime}`));
+}
+
+export type LessonPaymentFilter = "all" | "paid" | "unpaid";
+
+export function filterLessons(data: AppData, months: string[], studentId: string, subjectId: string, payment: LessonPaymentFilter, search: string) {
+  const selectedMonths = new Set(months);
+  const query = search.trim().toLocaleLowerCase("vi-VN");
+  return sortLessonsNewestFirst(data.lessons.filter((lesson) =>
+    selectedMonths.has(lesson.lessonDate.slice(0, 7)) &&
+    (studentId === "all" || lesson.studentId === studentId) &&
+    (subjectId === "all" || lesson.subjectId === subjectId) &&
+    (payment === "all" || Boolean(lesson.paid) === (payment === "paid")) &&
+    (!query || `${data.students.find((student) => student.id === lesson.studentId)?.name ?? ""} ${data.subjects.find((subject) => subject.id === lesson.subjectId)?.name ?? ""}`.toLocaleLowerCase("vi-VN").includes(query))
+  ));
 }
 
 export function moneyInputValue(value: number) {

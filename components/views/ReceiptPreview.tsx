@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, LoaderCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { AppData, AuthUser, NoticeType } from "@/lib/types";
+import { AppData, AuthUser, NoticeType, ReceiptTarget } from "@/lib/types";
 import { createReceiptPng, exportReceiptPng } from "@/lib/receipt-export";
 import { localReceiptPayment, ReceiptPayment } from "@/lib/receipt-payment";
-import { formatCurrency, getMonthlySummaryForMonths, minutesLabel, monthLabel, monthSelectionLabel, slugify } from "@/lib/utils";
+import { formatCurrency, getMonthlySummaryForMonths, getReceiptPaymentProgress, minutesLabel, monthLabel, monthSelectionLabel, slugify } from "@/lib/utils";
 
-export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }: { data: AppData; currentUser: AuthUser | null; target: { studentId: string; months: string[] }; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void }) {
+export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, onSetPaid }: { data: AppData; currentUser: AuthUser | null; target: ReceiptTarget; onClose: () => void; onNotice: (message: string, type?: NoticeType) => void; onSetPaid: (target: ReceiptTarget, paid: boolean) => void }) {
   const [payment, setPayment] = useState<ReceiptPayment | null | undefined>(currentUser ? undefined : localReceiptPayment);
   const [paymentError, setPaymentError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
@@ -18,6 +18,8 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
   const noticeRef = useRef(onNotice);
   noticeRef.current = onNotice;
   const summary = getMonthlySummaryForMonths(data, target.months, target.studentId)[0];
+  const { totalCount, paidCount, allPaid } = getReceiptPaymentProgress(data, target);
+  const paymentStatus = allPaid ? "Đã thu tiền" : paidCount > 0 ? `Đã thu ${paidCount}/${totalCount} buổi` : "Chưa thu tiền";
   const monthsKey = target.months.join("_");
   const fileMonths = target.months.length <= 4 ? monthsKey : `${target.months[0]}-${target.months.length}-thang`;
   const monthsLabel = target.months.map(monthLabel).join(" · ");
@@ -87,6 +89,11 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
       setIsExporting(false);
     }
   };
+  const updatePayment = () => {
+    setReceiptPng(null);
+    setIsPreparingPng(true);
+    onSetPaid(target, !allPaid);
+  };
   if (!summary || !student) return null;
   return <div className="receipt-screen">
     <div className="receipt-toolbar">
@@ -97,6 +104,10 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
     <div className="receipt-scroll">
       {paymentError && <p role="alert">{paymentError}</p>}
       {payment === null && <p role="status">Tài khoản chưa có đầy đủ thông tin chuyển khoản. Phiếu xuất sẽ không có mã QR.</p>}
+      <div className="receipt-payment-control">
+        <div><span>TRẠNG THÁI HỌC PHÍ</span><strong>{paymentStatus}</strong><small>{totalCount} buổi trong phiếu · {formatCurrency(summary.totalFee).replace(" ₫", "đ")}</small></div>
+        <button type="button" className={allPaid ? "receipt-payment-undo" : "receipt-payment-confirm"} onClick={updatePayment}>{allPaid ? "Chuyển về chưa thu" : "Xác nhận đã thu tiền"}</button>
+      </div>
       <div ref={receiptRef} className="receipt-card">
         <div className="receipt-top-decoration"><span /><span /><span /></div>
         <div className="receipt-heading-row">
@@ -109,6 +120,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice }:
           {summary.subjects.map((subject) => <div className="receipt-line" key={subject.subjectId}><div><div className="receipt-subject-heading"><strong>{subject.subjectName}</strong><Badge variant="secondary" className="receipt-count-badge">{subject.lessonCount} buổi</Badge></div><small>{minutesLabel(subject.totalDurationMinutes)}</small></div><strong>{formatCurrency(subject.totalFee).replace(" ₫", "đ")}</strong></div>)}
         </div>
         <div className="receipt-total"><span>TỔNG CỘNG</span><strong>{formatCurrency(summary.totalFee).replace(" ₫", "đ")}</strong></div>
+        <div className={`receipt-payment-state ${allPaid ? "is-paid" : ""}`}><span>TRẠNG THÁI HỌC PHÍ</span><strong>{paymentStatus}</strong></div>
         <div className="receipt-dates"><span>NGÀY ĐÃ HỌC</span><div className="receipt-date-badges">{summary.lessonDates.map((date) => { const [year, month, day] = date.split("-"); return <Badge variant="secondary" key={date}>{day}/{month}{years.size > 1 ? `/${year}` : ""}</Badge>; })}</div></div>
         {payment && <div className="receipt-qr">
           <span className="receipt-qr-label">THANH TOÁN CHUYỂN KHOẢN</span>

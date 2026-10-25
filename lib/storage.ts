@@ -53,7 +53,7 @@ export function normalizeAppData(data: AppData): AppData {
     subjects: data.subjects.map((subject) => ({ ...subject, active: normalizeBoolean(subject.active) })),
     students: data.students.map((student) => ({ ...student, active: normalizeBoolean(student.active) })),
     studentSubjects: data.studentSubjects.map((item) => ({ ...item, defaultFee: normalizeNumber(item.defaultFee), defaultDurationMinutes: normalizeNumber(item.defaultDurationMinutes), active: normalizeBoolean(item.active) })),
-    lessons: data.lessons.map((lesson) => ({ ...lesson, lessonDate: normalizeDateValue(lesson.lessonDate), startTime: normalizeTimeValue(lesson.startTime), durationMinutes: normalizeNumber(lesson.durationMinutes), fee: normalizeNumber(lesson.fee) })),
+    lessons: data.lessons.map((lesson) => ({ ...lesson, lessonDate: normalizeDateValue(lesson.lessonDate), startTime: normalizeTimeValue(lesson.startTime), durationMinutes: normalizeNumber(lesson.durationMinutes), fee: normalizeNumber(lesson.fee), paid: normalizeBoolean(lesson.paid) })),
   };
 }
 

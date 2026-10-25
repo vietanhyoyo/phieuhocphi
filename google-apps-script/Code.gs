@@ -1,15 +1,15 @@
 const DEFAULT_SPREADSHEET_ID = "1zBAWSnDb0h1oLsTkJzgclUXHtUrcG8FSIQ32NJ1jiDI";
 const SYNC_SECRET_PROPERTY = "TUTOR_SYNC_SECRET";
 
-// Every application table keeps userId in its last column. Keeping it last
-// lets the script read the old single-account tables and migrate them safely.
+// Keep the existing userId column position in App_Lessons so older sheets
+// remain readable; the payment flag is appended after it.
 const TABLES = {
   meta: { name: "App_Meta", headers: ["key", "value"] },
   users: { name: "App_Users", headers: ["id", "username", "passwordHash", "passwordSalt", "createdAt", "updatedAt", "bankName", "bankAccountName", "bankAccountNumber", "bankQrImage"] },
   subjects: { name: "App_Subjects", headers: ["id", "name", "active", "createdAt", "updatedAt", "userId"] },
   students: { name: "App_Students", headers: ["id", "name", "phone", "parentName", "parentPhone", "note", "active", "createdAt", "updatedAt", "userId"] },
   studentSubjects: { name: "App_StudentSubjects", headers: ["id", "studentId", "subjectId", "defaultFee", "defaultDurationMinutes", "active", "createdAt", "updatedAt", "userId"] },
-  lessons: { name: "App_Lessons", headers: ["id", "studentId", "subjectId", "lessonDate", "startTime", "durationMinutes", "fee", "note", "createdAt", "updatedAt", "userId"] },
+  lessons: { name: "App_Lessons", headers: ["id", "studentId", "subjectId", "lessonDate", "startTime", "durationMinutes", "fee", "note", "createdAt", "updatedAt", "userId", "paid"] },
   timetable: { name: "App_Timetable", headers: ["id", "dayOfWeek", "startTime", "endTime", "title", "studentName", "mode", "color", "note", "createdAt", "updatedAt", "userId"] },
   timetableSettings: { name: "App_TimetableSettings", headers: ["id", "title", "userId"] },
 };
@@ -266,11 +266,11 @@ function claimLegacyData_(userId) {
 function readTable_(table) {
   const sheet = spreadsheet_().getSheetByName(table.name);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const values = sheet.getRange(1, 1, sheet.getLastRow(), table.headers.length).getValues();
+  const values = sheet.getRange(1, 1, sheet.getLastRow(), Math.min(sheet.getMaxColumns(), table.headers.length)).getValues();
   return values.slice(1).filter((row) => row.some((value) => value !== "" && value !== null)).map((row) => {
     const item = {};
     table.headers.forEach((header, index) => { item[header] = row[index]; });
-    ["active"].forEach((key) => { if (key in item) item[key] = item[key] === true || String(item[key]).toLowerCase() === "true"; });
+    ["active", "paid"].forEach((key) => { if (key in item) item[key] = item[key] === true || String(item[key]).toLowerCase() === "true"; });
     ["defaultFee", "defaultDurationMinutes", "durationMinutes", "fee", "dayOfWeek"].forEach((key) => { if (key in item) item[key] = finiteNumber_(item[key]); });
     if ("lessonDate" in item) item.lessonDate = normalizeDateCell_(item.lessonDate);
     if ("startTime" in item) item.startTime = normalizeTimeCell_(item.startTime);
@@ -281,6 +281,7 @@ function readTable_(table) {
 
 function writeTable_(table, records) {
   const sheet = spreadsheet_().getSheetByName(table.name) || spreadsheet_().insertSheet(table.name);
+  if (sheet.getMaxColumns() < table.headers.length) sheet.insertColumnsAfter(sheet.getMaxColumns(), table.headers.length - sheet.getMaxColumns());
   sheet.clearContents();
   const rows = [table.headers].concat((records || []).map((record) => table.headers.map((header) => record[header] === undefined ? "" : record[header])));
   if (table === TABLES.users && rows.length > 1) sheet.getRange(2, 7, rows.length - 1, 4).setNumberFormat("@");

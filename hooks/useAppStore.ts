@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AppData, Lesson, Notice, NoticeType, Student, StudentDraft, StudentSubject, Subject, TimetableEntry, View } from "@/lib/types";
+import { AppData, Lesson, Notice, NoticeType, ReceiptTarget, Student, StudentDraft, StudentSubject, Subject, TimetableEntry, View } from "@/lib/types";
 import { isTimetableEntry, timetableConflict, WEEKDAYS } from "@/lib/timetable";
 import { createInitialData, isValidAppData, loadData, normalizeAppData, saveData } from "@/lib/storage";
 import { loadRemoteData, saveRemoteData } from "@/lib/cloud-storage";
-import { currentDate, currentMonth, emptyStudentDraft, uid } from "@/lib/utils";
+import { currentDate, currentMonth, emptyStudentDraft, getReceiptLessons, uid, updateReceiptLessonsPaid } from "@/lib/utils";
 
 export type AppStore = ReturnType<typeof useAppStore>;
 
@@ -20,7 +20,7 @@ export function useAppStore(accountId: string | null) {
   const [lessonModal, setLessonModal] = useState<Lesson | "new" | null>(null);
   const [studentModal, setStudentModal] = useState<Student | "new" | null>(null);
   const [subjectModal, setSubjectModal] = useState<Subject | "new" | null>(null);
-  const [receiptTarget, setReceiptTarget] = useState<{ studentId: string; months: string[] } | null>(null);
+  const [receiptTarget, setReceiptTarget] = useState<ReceiptTarget | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [storageStatus, setStorageStatus] = useState<"checking" | "local" | "cloud" | "syncing" | "error">("checking");
   const [confirmDelete, setConfirmDelete] = useState<Lesson | null>(null);
@@ -225,6 +225,14 @@ export function useAppStore(accountId: string | null) {
     notify(exists ? "Đã cập nhật buổi dạy." : "Đã lưu buổi dạy vào sổ.");
   };
 
+  const setReceiptPaid = (target: ReceiptTarget, paid: boolean) => {
+    const current = latestDataRef.current;
+    if (!getReceiptLessons(current, target).length) return;
+    const timestamp = new Date().toISOString();
+    updateData(updateReceiptLessonsPaid(current, target, paid, timestamp));
+    notify(paid ? "Đã ghi nhận thu học phí cho phiếu này." : "Đã chuyển học phí của phiếu này về chưa thu.");
+  };
+
   const removeLesson = () => {
     if (!confirmDelete) return;
     updateData({ ...data, lessons: data.lessons.filter((lesson) => lesson.id !== confirmDelete.id) });
@@ -294,7 +302,7 @@ export function useAppStore(accountId: string | null) {
     storageStatus, refreshRemoteData,
     openStudent, saveStudent, toggleStudentActive,
     openSubject, saveSubject, toggleSubject,
-    saveLesson, removeLesson, openRestore, notify,
+    saveLesson, setReceiptPaid, removeLesson, openRestore, notify,
     saveTimetable, removeTimetable, saveTimetableTitle,
   };
 }

@@ -50,10 +50,13 @@ export interface Lesson {
   startTime: string;
   durationMinutes: number;
   fee: number;
+  paid: boolean;
   note?: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export type ReceiptTarget = { studentId: string; months: string[] };
 
 export interface TimetableEntry {
   id: string;
