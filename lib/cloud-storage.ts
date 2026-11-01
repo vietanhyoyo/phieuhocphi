@@ -19,11 +19,11 @@ export async function loadRemoteData(): Promise<RemoteLoadResult> {
   return { configured: Boolean(body.configured), data: body.data ? normalizeAppData(body.data) : null };
 }
 
-export async function saveRemoteData(data: AppData) {
+export async function saveRemoteData(data: AppData, accountId: string) {
   const response = await fetch("/api/sheets", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ data: normalizeAppData(data) }),
+    body: JSON.stringify({ data: normalizeAppData(data), accountId }),
   });
   await parseResponse(response);
 }

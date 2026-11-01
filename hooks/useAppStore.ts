@@ -5,6 +5,8 @@ import { AppData, Lesson, Notice, NoticeType, ReceiptTarget, Student, StudentDra
 import { isTimetableEntry, timetableConflict, WEEKDAYS } from "@/lib/timetable";
 import { createInitialData, isValidAppData, loadData, normalizeAppData, saveData } from "@/lib/storage";
 import { loadRemoteData, saveRemoteData } from "@/lib/cloud-storage";
+import { clearPendingSave, hasLocalData, loadPendingSave, loadSyncedData, markMisScopedSaveMigrated, reconcileData, recoverMisScopedData, sameData, saveSyncedData, stagePendingSave, wasMisScopedSaveMigrated } from "@/lib/sync-queue";
+import { loadCachedAccount } from "@/lib/account-cache";
 import { currentDate, currentMonth, emptyStudentDraft, getReceiptLessons, uid, updateReceiptLessonsPaid } from "@/lib/utils";
 
 export type AppStore = ReturnType<typeof useAppStore>;
@@ -30,6 +32,7 @@ export function useAppStore(accountId: string | null) {
   const cloudEnabledRef = useRef(false);
   const latestDataRef = useRef<AppData>(createInitialData());
   const saveQueueRef = useRef(Promise.resolve());
+  const refreshingRef = useRef<{ ownerId: string; promise: Promise<void> } | null>(null);
   const syncErrorShownRef = useRef(false);
   const activeAccountRef = useRef(accountId);
   activeAccountRef.current = accountId;
@@ -45,15 +48,43 @@ export function useAppStore(accountId: string | null) {
     }
 
     cloudEnabledRef.current = false;
-    const localData = loadData(storageScope);
+    let queued = loadPendingSave(storageScope);
+    let localData = queued?.data ?? loadData(storageScope);
+    const misplaced = storageScope !== "local" && loadCachedAccount()?.id === storageScope ? loadPendingSave("local") : null;
+    if (misplaced && !wasMisScopedSaveMigrated(storageScope, misplaced.revision)) {
+      const recovered = recoverMisScopedData(localData, misplaced.data);
+      if (!sameData(recovered, localData)) {
+        localData = recovered;
+        queued = stagePendingSave(storageScope, recovered);
+      }
+      markMisScopedSaveMigrated(storageScope, misplaced.revision);
+    }
+    if (queued) saveData(localData, storageScope);
     latestDataRef.current = localData;
     setData(localData);
     setStorageStatus("checking");
     setHydrated(true);
     syncErrorShownRef.current = false;
     saveQueueRef.current = Promise.resolve();
-    void refreshRemoteData(localData);
+    void refreshRemoteData(localData, accountId);
   }, [accountId]);
+
+  useEffect(() => {
+    if (!accountId) return;
+    const retry = () => {
+      if (document.visibilityState === "visible" && navigator.onLine && (loadPendingSave(accountId) || storageStatus === "error")) {
+        void refreshRemoteData(latestDataRef.current, accountId);
+      }
+    };
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", retry);
+    const timer = window.setInterval(retry, 30000);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", retry);
+      window.clearInterval(timer);
+    };
+  }, [accountId, storageStatus]);
 
   useEffect(() => {
     if (!notice) return;
@@ -61,15 +92,19 @@ export function useAppStore(accountId: string | null) {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const queueRemoteSave = (next: AppData, ownerId: string | null = accountId): Promise<boolean | null> => {
+  const queueRemoteSave = (ownerId: string | null = accountId): Promise<boolean | null> => {
     if (!ownerId || !cloudEnabledRef.current) return Promise.resolve(null);
     const saveTask = saveQueueRef.current
       .then(async () => {
         if (ownerId !== activeAccountRef.current) return false;
+        const pending = loadPendingSave(ownerId);
+        if (!pending) return true;
         setStorageStatus("syncing");
-        await saveRemoteData(next);
+        await saveRemoteData(pending.data, ownerId);
         if (ownerId !== activeAccountRef.current) return false;
-        setStorageStatus("cloud");
+        saveSyncedData(ownerId, pending.data);
+        clearPendingSave(ownerId, pending.revision);
+        setStorageStatus(loadPendingSave(ownerId) ? "syncing" : "cloud");
         syncErrorShownRef.current = false;
         return true;
       })
@@ -86,7 +121,17 @@ export function useAppStore(accountId: string | null) {
     return saveTask;
   };
 
-  const refreshRemoteData = async (fallbackData = latestDataRef.current, ownerId: string | null = accountId) => {
+  const refreshRemoteData = (fallbackData = latestDataRef.current, ownerId: string | null = accountId): Promise<void> => {
+    if (!ownerId) return Promise.resolve();
+    if (refreshingRef.current?.ownerId === ownerId) return refreshingRef.current.promise;
+    const promise = refreshRemoteDataNow(fallbackData, ownerId).finally(() => {
+      if (refreshingRef.current?.promise === promise) refreshingRef.current = null;
+    });
+    refreshingRef.current = { ownerId, promise };
+    return promise;
+  };
+
+  const refreshRemoteDataNow = async (fallbackData: AppData, ownerId: string) => {
     if (!ownerId) return;
     setStorageStatus("checking");
     try {
@@ -98,28 +143,36 @@ export function useAppStore(accountId: string | null) {
         return;
       }
       cloudEnabledRef.current = true;
-      if (remote.data) {
-        latestDataRef.current = remote.data;
-        setData(remote.data);
-        saveData(remote.data, storageScope);
+      const pending = loadPendingSave(ownerId);
+      const localExists = hasLocalData(ownerId) || Boolean(pending);
+      const local = pending?.data ?? (localExists ? latestDataRef.current : fallbackData);
+      const merged = remote.data && !localExists
+        ? remote.data
+        : reconcileData(local, remote.data, loadSyncedData(ownerId));
+      latestDataRef.current = merged;
+      setData(merged);
+      saveData(merged, ownerId);
+      if (remote.data && sameData(merged, remote.data)) {
+        if (pending) clearPendingSave(ownerId, pending.revision);
+        saveSyncedData(ownerId, merged);
+        setStorageStatus("cloud");
       } else {
-        await saveRemoteData(fallbackData);
-        if (ownerId !== activeAccountRef.current) return;
+        stagePendingSave(ownerId, merged);
+        await queueRemoteSave(ownerId);
       }
-      setStorageStatus("cloud");
     } catch {
       if (ownerId !== activeAccountRef.current) return;
-      cloudEnabledRef.current = false;
       setStorageStatus("error");
     }
   };
 
   const updateData = (next: AppData) => {
     const normalized = normalizeAppData(next);
+    if (accountId) stagePendingSave(accountId, normalized);
     latestDataRef.current = normalized;
     setData(normalized);
     saveData(normalized, storageScope);
-    return queueRemoteSave(normalized, accountId);
+    return queueRemoteSave(accountId);
   };
 
   const notify = (message: string, type: NoticeType = "success") => setNotice({ message, type });

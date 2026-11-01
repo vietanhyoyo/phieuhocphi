@@ -182,7 +182,7 @@ function readAppData_(userId) {
 }
 
 function readUserTable_(table, userId) {
-  return readTable_(table).filter((item) => String(item.userId || "").trim() === userId);
+  return dedupeById_(readTable_(table).filter((item) => String(item.userId || "").trim() === userId));
 }
 
 function migrateSingleAccountLegacyData_(userId) {
@@ -222,7 +222,7 @@ function validateTimetable_(data) {
   if (data.timetable === undefined) return;
   if (!Array.isArray(data.timetable)) throw new Error("Thời khóa biểu không hợp lệ.");
   const ids = new Set();
-  const colors = ["#fef08a", "#fdba74", "#67e8f9", "#bbf7d0", "#ddd6fe", "#fbcfe8"];
+  const colors = ["#fef08a", "#fdba74", "#fca5a5", "#fbcfe8", "#f0abfc", "#ddd6fe", "#67e8f9", "#93c5fd", "#5eead4", "#bbf7d0", "#bef264", "#a5f3fc", "#fde68a", "#d1d5db"];
   const time = /^([01]\d|2[0-3]):[0-5]\d$/;
   data.timetable.forEach((item) => {
     if (!item || typeof item.id !== "string" || !item.id || ids.has(item.id)
@@ -251,8 +251,18 @@ function setupTimetable() {
 function mergeUserTable_(table, userId, records) {
   const allRecords = readTable_(table);
   const otherAccounts = allRecords.filter((record) => String(record.userId || "").trim() !== userId);
-  const accountRecords = (records || []).map((record) => Object.assign({}, record, { userId }));
+  const accountRecords = dedupeById_((records || []).map((record) => Object.assign({}, record, { userId })));
   writeTable_(table, otherAccounts.concat(accountRecords));
+}
+
+function dedupeById_(records) {
+  const seen = Object.create(null);
+  return records.filter((record) => {
+    const id = String(record.id || "").trim();
+    if (!id || seen[id]) return false;
+    seen[id] = true;
+    return true;
+  });
 }
 
 function claimLegacyData_(userId) {

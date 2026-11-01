@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, LoaderCircle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -20,21 +20,52 @@ import { exportBackup } from "@/lib/storage";
 import { useAppStore } from "@/hooks/useAppStore";
 import { AuthView } from "@/components/views/AuthView";
 import { AuthUser } from "@/lib/types";
+import { cacheAccount, clearCachedAccount, loadCachedAccount } from "@/lib/account-cache";
 
 export default function Page() {
   const [auth, setAuth] = useState<{ loading: boolean; configured: boolean; authenticated: boolean; hasUsers: boolean; user: AuthUser | null; error?: string }>({ loading: true, configured: false, authenticated: true, hasUsers: false, user: null });
   const [loginNotice, setLoginNotice] = useState("");
-  const storageScope = auth.configured ? (auth.authenticated && auth.user ? auth.user.id : null) : "local";
+  const authRetryNeededRef = useRef(false);
+  const storageScope = auth.loading ? null : auth.configured ? (auth.authenticated && auth.user ? auth.user.id : null) : "local";
   const app = useAppStore(storageScope);
 
   useEffect(() => {
-    fetch("/api/auth", { cache: "no-store" })
-      .then(async (response) => ({ response, body: await response.json().catch(() => ({})) as { configured?: boolean; authenticated?: boolean; hasUsers?: boolean; user?: AuthUser | null; message?: string } }))
-      .then(({ body }) => setAuth({ loading: false, configured: Boolean(body.configured), authenticated: Boolean(body.authenticated), hasUsers: Boolean(body.hasUsers), user: body.user ?? null, error: body.message }))
-      .catch(() => setAuth({ loading: false, configured: false, authenticated: true, hasUsers: false, user: null }));
+    let active = true;
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth", { cache: "no-store" });
+        const body = await response.json() as { configured?: boolean; authenticated?: boolean; hasUsers?: boolean; user?: AuthUser | null; message?: string };
+        if (!response.ok) throw new Error(body.message || "Không thể kiểm tra tài khoản.");
+        if (!active) return;
+        authRetryNeededRef.current = false;
+        if (body.configured && body.authenticated && body.user) cacheAccount(body.user);
+        else clearCachedAccount();
+        setAuth({ loading: false, configured: Boolean(body.configured), authenticated: Boolean(body.authenticated), hasUsers: Boolean(body.hasUsers), user: body.user ?? null });
+      } catch {
+        if (!active) return;
+        authRetryNeededRef.current = true;
+        const cached = loadCachedAccount();
+        // A failed auth request does not mean the app has no server. Keep
+        // offline edits in the last account's storage and retry on reconnect.
+        setAuth((current) => ({ loading: false, configured: true, authenticated: Boolean(cached || current.user), hasUsers: current.hasUsers, user: cached || current.user }));
+      }
+    };
+    const retryAuth = () => { if (authRetryNeededRef.current && document.visibilityState === "visible" && navigator.onLine) void checkAuth(); };
+    void checkAuth();
+    window.addEventListener("online", retryAuth);
+    document.addEventListener("visibilitychange", retryAuth);
+    const timer = window.setInterval(retryAuth, 30000);
+    return () => {
+      active = false;
+      window.removeEventListener("online", retryAuth);
+      document.removeEventListener("visibilitychange", retryAuth);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const handleAuthenticated = async (user: AuthUser) => {
+    cacheAccount(user);
+    authRetryNeededRef.current = false;
     app.setView("home");
     app.setSelectedStudentId(null);
     app.setSearch("");
@@ -43,12 +74,14 @@ export default function Page() {
   };
 
   const handlePasswordChanged = () => {
+    clearCachedAccount();
     setLoginNotice("Mật khẩu đã được đổi. Vui lòng đăng nhập lại bằng mật khẩu mới.");
     setAuth((current) => ({ ...current, authenticated: false, user: null }));
   };
 
   const logout = async () => {
     await fetch("/api/auth", { method: "DELETE" });
+    clearCachedAccount();
     setAuth((current) => ({ ...current, authenticated: false, user: null }));
   };
 

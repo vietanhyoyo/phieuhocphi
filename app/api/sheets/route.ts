@@ -23,7 +23,8 @@ export async function POST(request: Request) {
   if (isAuthConfigured() && !session) return NextResponse.json({ message: "Bạn cần đăng nhập để lưu dữ liệu." }, { status: 401 });
 
   try {
-    const body = (await request.json()) as { data?: unknown };
+    const body = (await request.json()) as { data?: unknown; accountId?: unknown };
+    if (body.accountId !== (session?.id || "local")) return NextResponse.json({ message: "Tài khoản đồng bộ không khớp." }, { status: 403 });
     if (!isValidAppData(body.data)) return NextResponse.json({ message: "Dữ liệu ứng dụng không hợp lệ." }, { status: 400 });
     await callAppsScript({ action: "saveData", userId: session?.id || "local", data: body.data });
     return NextResponse.json({ ok: true });

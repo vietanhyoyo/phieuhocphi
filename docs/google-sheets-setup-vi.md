@@ -51,9 +51,17 @@ Lần đồng bộ đầu tiên, Apps Script tự tạo các tab:
 - `App_StudentSubjects`
 - `App_Lessons`
 
-Nếu sheet chưa có dữ liệu, dữ liệu hiện có trong localStorage sẽ được tải lên lần đầu. Nếu sheet đã có dữ liệu, dữ liệu trên sheet được ưu tiên và ghi đè bản đệm local.
+Nếu sheet chưa có dữ liệu, dữ liệu hiện có trong localStorage sẽ được tải lên lần đầu. Nếu thiết bị chưa có dữ liệu của tài khoản, ứng dụng tải dữ liệu từ Sheet. Khi cả hai phía đều có dữ liệu, bản local được ưu tiên theo ID; bản ghi mới chỉ có trên Sheet vẫn được bổ sung. Bản ghi đã xóa ở local không được phục hồi từ bản Sheet cũ.
 
 `localStorage` vẫn giữ một bản đệm riêng cho từng tài khoản để ứng dụng có thể mở khi mất mạng. Mọi thay đổi mới được lưu vào bản đệm trước, sau đó xếp hàng đồng bộ lên Google Sheet.
+
+## Hàng đợi đồng bộ
+
+- Mỗi tài khoản có một bản chờ đồng bộ lưu bền trong `localStorage`. Bản này chứa đầy đủ môn học, học sinh, môn gán cho học sinh, buổi dạy (gồm học phí và trạng thái đã thu), thời khóa biểu và tiêu đề lịch. Các thay đổi liên tiếp được gộp thành bản dữ liệu mới nhất; tải lại trang không làm mất bản chờ.
+- Khi mở ứng dụng, có mạng trở lại, quay lại tab hoặc trong lần thử định kỳ, ứng dụng tải Sheet để đối chiếu rồi gửi bản chờ. Nếu lần ghi trước đã thành công nhưng phản hồi bị mất, dữ liệu khớp theo ID sẽ được nhận là đã đồng bộ mà không tạo thêm dòng.
+- Nếu Sheet thiếu bản ghi đang có ở local, ứng dụng đưa dữ liệu local vào hàng đợi và gửi lại. Apps Script lọc ID trùng trong mỗi tài khoản trước khi ghi, vì vậy việc thử lại không tạo hai dòng cho cùng một bản ghi.
+- Trạng thái “Đã đồng bộ Google Sheet” chỉ xuất hiện khi hàng đợi hiện tại đã được xác nhận. Khi gửi thất bại, ứng dụng giữ bản local và tự thử lại.
+- Nếu tải lại trang khi mất mạng, ứng dụng giữ tài khoản đã xác minh gần nhất để ghi mọi chỉnh sửa vào đúng kho dữ liệu của tài khoản. Khi kết nối trở lại, ứng dụng kiểm tra phiên đăng nhập rồi đồng bộ bản chờ. Các bản ghi mới hoặc đã chỉnh sửa từng bị lưu nhầm vào kho `local` trên bản cũ được chuyển về tài khoản khi có thể xác định chắc chắn tài khoản đó.
 
 Các tab dữ liệu có thêm cột `userId`. Khi tài khoản đăng nhập, Apps Script chỉ tải và cập nhật các dòng có đúng `userId` đó; học sinh, môn học, buổi dạy và học phí giữa các tài khoản không bị trộn lẫn. Dữ liệu cũ chưa có `userId` sẽ được gán cho tài khoản đầu tiên khi Sheet vẫn chỉ có một tài khoản.
 
@@ -113,6 +121,8 @@ Sau khi cập nhật và triển khai Apps Script, chạy `setupTimetable` để
 còn thiếu; hàm giữ nguyên tab đã có. Các phiên bản ứng dụng cũ không gửi trường
 lịch tuần sẽ không xóa lịch khi đồng bộ. Bản sao lưu cũ vẫn đọc được, lịch tuần
 ban đầu là rỗng. Backup mới bao gồm cả lịch và tiêu đề.
+
+Hãy cập nhật bản triển khai Apps Script hiện có sau khi nâng cấp: bản mã mới chấp nhận đầy đủ các màu thời khóa biểu có trong ứng dụng.
 
 Trong **Lịch tuần**, chạm vào một ô có lịch để chỉnh sửa ca học. Lịch mới được lưu
 tạm trên thiết bị trước rồi đồng bộ Sheet theo trạng thái hiển thị của ứng dụng.
