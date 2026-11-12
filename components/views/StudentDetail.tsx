@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowLeft, BookOpen, ChevronRight, NotebookPen, Phone, Plus, PencilLine, ReceiptText, UserRound, WalletCards } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, NotebookPen, Phone, Plus, PencilLine, ReceiptText, Trash2, UserRound, WalletCards } from "lucide-react";
 import { VietnameseMultiMonthPicker } from "@/components/shared/VietnameseMultiMonthPicker";
 import { LessonRow } from "@/components/shared/LessonRow";
 import { AppData, Student } from "@/lib/types";
 import { formatCurrency, getMonthlySummaryForMonths, minutesLabel, monthSelectionLabel, sortLessonsNewestFirst } from "@/lib/utils";
 
-export function StudentDetail({ data, student, months, setMonths, onBack, onEdit, onRecord, onToggleActive, onReceipt }: {
+export function StudentDetail({ data, student, months, setMonths, onBack, onEdit, onRecord, onToggleActive, onDelete, onReceipt }: {
   data: AppData;
   student: Student;
   months: string[];
@@ -15,6 +15,7 @@ export function StudentDetail({ data, student, months, setMonths, onBack, onEdit
   onEdit: () => void;
   onRecord: () => void;
   onToggleActive: () => void;
+  onDelete: () => void;
   onReceipt: () => void;
 }) {
   const summary = getMonthlySummaryForMonths(data, months, student.id)[0];
@@ -37,6 +38,7 @@ export function StudentDetail({ data, student, months, setMonths, onBack, onEdit
       <div className="profile-actions">
         <button className="primary-button" onClick={onRecord}><Plus size={17} /> Ghi nhận buổi</button>
         <button className="ghost-button" onClick={onToggleActive}>{student.active ? "Cho nghỉ học" : "Kích hoạt lại"}</button>
+        {!student.active && <button className="danger-button" onClick={onDelete}><Trash2 size={16} /> Xóa học sinh</button>}
       </div>
     </section>
 

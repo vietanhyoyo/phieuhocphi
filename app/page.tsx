@@ -103,7 +103,7 @@ export default function Page() {
           {app.view === "home" && <HomeView data={app.data} months={app.months} setMonths={app.setMonths} onRecord={() => app.setLessonModal("new")} onStudent={(id) => { app.setSelectedStudentId(id); app.setView("students"); }} onViewLessons={() => app.setView("lessons")} />}
           {app.view === "lessons" && <LessonsView data={app.data} months={app.months} setMonths={app.setMonths} search={app.search} setSearch={app.setSearch} onRecord={() => app.setLessonModal("new")} onEdit={(lesson) => app.setLessonModal(lesson)} onDelete={app.setConfirmDelete} />}
           {app.view === "students" && (
-            selectedStudent ? <StudentDetail data={app.data} student={selectedStudent} months={app.months} setMonths={app.setMonths} onBack={() => app.setSelectedStudentId(null)} onEdit={() => app.openStudent(selectedStudent)} onRecord={() => app.setLessonModal("new")} onToggleActive={() => app.toggleStudentActive(selectedStudent)} onReceipt={() => app.setReceiptTarget({ studentId: selectedStudent.id, months: app.months })} /> :
+            selectedStudent ? <StudentDetail data={app.data} student={selectedStudent} months={app.months} setMonths={app.setMonths} onBack={() => app.setSelectedStudentId(null)} onEdit={() => app.openStudent(selectedStudent)} onRecord={() => app.setLessonModal("new")} onToggleActive={() => app.toggleStudentActive(selectedStudent)} onDelete={() => app.setConfirmDeleteStudent(selectedStudent)} onReceipt={() => app.setReceiptTarget({ studentId: selectedStudent.id, months: app.months })} /> :
               <StudentsView data={app.data} search={app.search} setSearch={app.setSearch} onAdd={() => app.openStudent("new")} onEdit={app.openStudent} onSelect={(id) => app.setSelectedStudentId(id)} />
           )}
           {app.view === "tuition" && <TuitionView data={app.data} months={app.months} setMonths={app.setMonths} onReceipt={(studentId) => app.setReceiptTarget({ studentId, months: app.months })} onStudent={(id) => { app.setSelectedStudentId(id); app.setView("students"); }} />}
@@ -120,6 +120,11 @@ export default function Page() {
       {app.studentModal && <StudentModal data={app.data} draft={app.studentDraft} setDraft={app.setStudentDraft} initial={app.studentModal === "new" ? null : app.studentModal} onClose={() => app.setStudentModal(null)} onSave={app.saveStudent} />}
       {app.subjectModal && <SubjectModal initial={app.subjectModal === "new" ? null : app.subjectModal} name={app.subjectName} setName={app.setSubjectName} onClose={() => app.setSubjectModal(null)} onSave={app.saveSubject} />}
       {app.confirmDelete && <ConfirmModal title="Xóa buổi dạy?" message="Buổi này sẽ bị xóa khỏi lịch sử và tổng học phí tháng sẽ được tính lại." confirmLabel="Xóa buổi dạy" onClose={() => app.setConfirmDelete(null)} onConfirm={app.removeLesson} />}
+      {app.confirmDeleteStudent && (() => {
+        const target = app.confirmDeleteStudent;
+        const lessonCount = app.data.lessons.filter((lesson) => lesson.studentId === target.id).length;
+        return <ConfirmModal title={`Xóa học sinh ${target.name}?`} message={`Hồ sơ, môn học đã gán và ${lessonCount} buổi học của học sinh này sẽ bị xóa vĩnh viễn khỏi ứng dụng và Google Sheet. Không thể hoàn tác.`} confirmLabel="Xóa học sinh" onClose={() => app.setConfirmDeleteStudent(null)} onConfirm={app.removeStudent} />;
+      })()}
       {app.receiptTarget && <ReceiptPreview key={auth.user?.id ?? "local"} data={app.data} currentUser={auth.user} target={app.receiptTarget} onClose={() => app.setReceiptTarget(null)} onNotice={app.notify} onSetPaid={app.setReceiptPaid} isStorageChecking={app.storageStatus === "checking"} />}
       {app.notice && <div className={`toast ${app.notice.type === "error" ? "toast-error" : ""}`}><span className="toast-icon">{app.notice.type === "error" ? <AlertTriangle size={17} /> : <Check size={17} />}</span>{app.notice.message}</div>}
     </main>

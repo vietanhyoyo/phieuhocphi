@@ -100,6 +100,22 @@ test('a locally deleted lesson is not restored from the last synced server snaps
   assert.equal(merged.lessons.length, 0);
 });
 
+test('an offline lesson deletion survives reload and is pushed before server data is reused', () => {
+  cells.clear();
+  const synced = data([lesson('keep'), lesson('deleted')]);
+  queue.saveSyncedData('user-a', synced);
+  // Delete while offline: only the durable queue is written.
+  queue.stagePendingSave('user-a', data([lesson('keep')]));
+  // After reload the queue, not the stale server copy, is the local source.
+  const pending = queue.loadPendingSave('user-a');
+  assert.equal(pending.data.lessons.map((item) => item.id).join(), 'keep');
+  // Back online: the server still has the lesson, plus one added elsewhere.
+  const remote = data([lesson('keep'), lesson('deleted'), lesson('other-device')]);
+  const merged = queue.reconcileData(pending.data, remote, queue.loadSyncedData('user-a'));
+  assert.equal(merged.lessons.map((item) => item.id).join(), 'keep,other-device');
+  assert.equal(queue.sameData(merged, remote), false, 'merged data must be pushed to the server');
+});
+
 test('pending saves and sync baselines are isolated per account', () => {
   cells.clear();
   queue.stagePendingSave('account-a', data([lesson('private')]));
@@ -172,4 +188,40 @@ test('offline edits of every record type written to the old local scope are reco
   assert.equal(queue.wasMisScopedSaveMigrated('user-a', 'revision-1'), false);
   queue.markMisScopedSaveMigrated('user-a', 'revision-1');
   assert.equal(queue.wasMisScopedSaveMigrated('user-a', 'revision-1'), true);
+});
+
+test('a deleted student and its assignments and lessons are not restored from the server', () => {
+  const stamp = { createdAt: '2026-01-01', updatedAt: '2026-11-01' };
+  const withStudent = storage.normalizeAppData({
+    ...data([lesson('keep'), { ...lesson('gone'), studentId: 'left' }]),
+    students: [{ id: 'student', name: 'An', active: true, ...stamp }, { id: 'left', name: 'Bình', active: false, ...stamp }],
+    studentSubjects: [{ id: 'assign-left', studentId: 'left', subjectId: 'math', defaultFee: 1, defaultDurationMinutes: 90, active: true, ...stamp }],
+  });
+  const afterDelete = storage.normalizeAppData({
+    ...withStudent,
+    students: withStudent.students.filter((item) => item.id !== 'left'),
+    studentSubjects: [],
+    lessons: withStudent.lessons.filter((item) => item.studentId !== 'left'),
+  });
+  const merged = queue.reconcileData(afterDelete, withStudent, withStudent);
+  assert.equal(merged.students.map((item) => item.id).join(), 'student');
+  assert.equal(merged.studentSubjects.length, 0);
+  assert.equal(merged.lessons.map((item) => item.id).join(), 'keep');
+});
+
+test('Apps Script drops rows missing from an account save but keeps other accounts', () => {
+  const source = readFileSync(path.join(__dirname, '../google-apps-script/Code.gs'), 'utf8');
+  const context = {};
+  vm.runInNewContext(`${source}\nglobalThis.mergeForTest = function(rows, records) {
+    var written;
+    readTable_ = function() { return rows; };
+    writeTable_ = function(table, next) { written = next; };
+    mergeUserTable_(TABLES.students, 'user-a', records);
+    return written;
+  };`, context);
+  const written = context.mergeForTest(
+    [{ id: 'left', userId: 'user-a' }, { id: 'stay', userId: 'user-a' }, { id: 'other', userId: 'user-b' }],
+    [{ id: 'stay' }],
+  );
+  assert.equal(Array.from(written, (row) => `${row.userId}:${row.id}`).sort().join(), 'user-a:stay,user-b:other');
 });

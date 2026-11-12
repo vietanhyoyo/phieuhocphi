@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppData, Lesson, Notice, NoticeType, ReceiptTarget, Student, StudentDraft, StudentSubject, Subject, TimetableEntry, View } from "@/lib/types";
 import { isTimetableEntry, timetableConflict, WEEKDAYS } from "@/lib/timetable";
-import { createInitialData, isValidAppData, loadData, normalizeAppData, saveData } from "@/lib/storage";
+import { createInitialData, isValidAppData, loadData, normalizeAppData, saveData, STORAGE_KEY } from "@/lib/storage";
 import { loadRemoteData, saveRemoteData } from "@/lib/cloud-storage";
 import { clearPendingSave, hasLocalData, loadPendingSave, loadSyncedData, markMisScopedSaveMigrated, reconcileData, recoverMisScopedData, sameData, saveSyncedData, stagePendingSave, wasMisScopedSaveMigrated } from "@/lib/sync-queue";
 import { loadCachedAccount } from "@/lib/account-cache";
@@ -26,6 +26,7 @@ export function useAppStore(accountId: string | null) {
   const [notice, setNotice] = useState<Notice>(null);
   const [storageStatus, setStorageStatus] = useState<"checking" | "local" | "cloud" | "syncing" | "error">("checking");
   const [confirmDelete, setConfirmDelete] = useState<Lesson | null>(null);
+  const [confirmDeleteStudent, setConfirmDeleteStudent] = useState<Student | null>(null);
   const [studentDraft, setStudentDraft] = useState<StudentDraft>(emptyStudentDraft());
   const [subjectName, setSubjectName] = useState("");
   const restoreRef = useRef<HTMLInputElement>(null);
@@ -34,6 +35,10 @@ export function useAppStore(accountId: string | null) {
   const saveQueueRef = useRef(Promise.resolve());
   const refreshingRef = useRef<{ ownerId: string; promise: Promise<void> } | null>(null);
   const syncErrorShownRef = useRef(false);
+  // IDs for a record being created are fixed when its modal opens, so a
+  // repeated tap on Save updates that record instead of adding a duplicate.
+  const newStudentIdRef = useRef(uid("student"));
+  const newSubjectIdRef = useRef(uid("subject"));
   const activeAccountRef = useRef(accountId);
   activeAccountRef.current = accountId;
 
@@ -85,6 +90,22 @@ export function useAppStore(accountId: string | null) {
       window.clearInterval(timer);
     };
   }, [accountId, storageStatus]);
+
+  // Another tab of the same account shares this localStorage queue. Adopt its
+  // writes so an edit here never overwrites the queue with an older snapshot.
+  useEffect(() => {
+    if (!accountId) return;
+    const key = `${STORAGE_KEY}:${accountId}`;
+    const adopt = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage || event.key !== key || !event.newValue) return;
+      const next = loadPendingSave(accountId)?.data ?? loadData(accountId);
+      if (sameData(next, latestDataRef.current)) return;
+      latestDataRef.current = next;
+      setData(next);
+    };
+    window.addEventListener("storage", adopt);
+    return () => window.removeEventListener("storage", adopt);
+  }, [accountId]);
 
   useEffect(() => {
     if (!notice) return;
@@ -182,6 +203,7 @@ export function useAppStore(accountId: string | null) {
   const openStudent = (student: Student | "new") => {
     setStudentModal(student);
     if (student === "new") {
+      newStudentIdRef.current = uid("student");
       setStudentDraft(emptyStudentDraft());
       return;
     }
@@ -201,6 +223,7 @@ export function useAppStore(accountId: string | null) {
   };
 
   const openSubject = (subject: Subject | "new") => {
+    if (subject === "new") newSubjectIdRef.current = uid("subject");
     setSubjectModal(subject);
     setSubjectName(subject === "new" ? "" : subject.name);
   };
@@ -212,18 +235,17 @@ export function useAppStore(accountId: string | null) {
       notify("Vui lòng nhập tên học sinh.", "error");
       return;
     }
+    const current = latestDataRef.current;
     const timestamp = new Date().toISOString();
-    let studentId: string;
-    let nextStudents = [...data.students];
-    if (studentModal === "new") {
-      studentId = uid("student");
+    const studentId = studentModal === "new" ? newStudentIdRef.current : studentModal.id;
+    let nextStudents = [...current.students];
+    if (!nextStudents.some((student) => student.id === studentId)) {
       nextStudents.push({ id: studentId, name, phone: studentDraft.phone.trim(), parentName: studentDraft.parentName.trim(), parentPhone: studentDraft.parentPhone.trim(), note: studentDraft.note.trim(), active: true, createdAt: timestamp, updatedAt: timestamp });
     } else {
-      studentId = studentModal.id;
       nextStudents = nextStudents.map((student) => student.id === studentId ? { ...student, name, phone: studentDraft.phone.trim(), parentName: studentDraft.parentName.trim(), parentPhone: studentDraft.parentPhone.trim(), note: studentDraft.note.trim(), updatedAt: timestamp } : student);
     }
-    const existing = data.studentSubjects.filter((item) => item.studentId === studentId);
-    const nextAssignments = data.subjects.flatMap((subject) => {
+    const existing = current.studentSubjects.filter((item) => item.studentId === studentId);
+    const nextAssignments = current.subjects.flatMap((subject) => {
       const draft = studentDraft.assignments[subject.id];
       const old = existing.find((item) => item.subjectId === subject.id);
       if (!draft?.active) return [];
@@ -238,15 +260,16 @@ export function useAppStore(accountId: string | null) {
         updatedAt: timestamp,
       } satisfies StudentSubject];
     });
-    const untouched = data.studentSubjects.filter((item) => item.studentId !== studentId);
-    updateData({ ...data, students: nextStudents, studentSubjects: [...untouched, ...nextAssignments] });
+    const untouched = current.studentSubjects.filter((item) => item.studentId !== studentId);
+    updateData({ ...current, students: nextStudents, studentSubjects: [...untouched, ...nextAssignments] });
     setStudentModal(null);
     notify(studentModal === "new" ? "Đã thêm học sinh mới." : "Đã cập nhật thông tin học sinh.");
   };
 
   const toggleStudentActive = (student: Student) => {
     const timestamp = new Date().toISOString();
-    updateData({ ...data, students: data.students.map((item) => item.id === student.id ? { ...item, active: !item.active, updatedAt: timestamp } : item) });
+    const current = latestDataRef.current;
+    updateData({ ...current, students: current.students.map((item) => item.id === student.id ? { ...item, active: !item.active, updatedAt: timestamp } : item) });
     notify(student.active ? "Đã chuyển học sinh sang trạng thái nghỉ học." : "Đã kích hoạt lại học sinh.");
   };
 
@@ -257,27 +280,31 @@ export function useAppStore(accountId: string | null) {
       notify("Vui lòng nhập tên môn học.", "error");
       return;
     }
+    const current = latestDataRef.current;
     const timestamp = new Date().toISOString();
-    if (subjectModal === "new") {
-      updateData({ ...data, subjects: [...data.subjects, { id: uid("subject"), name, active: true, createdAt: timestamp, updatedAt: timestamp }] });
+    const subjectId = subjectModal === "new" ? newSubjectIdRef.current : subjectModal.id;
+    if (!current.subjects.some((subject) => subject.id === subjectId)) {
+      updateData({ ...current, subjects: [...current.subjects, { id: subjectId, name, active: true, createdAt: timestamp, updatedAt: timestamp }] });
       notify("Đã thêm môn học.");
     } else {
-      updateData({ ...data, subjects: data.subjects.map((subject) => subject.id === subjectModal.id ? { ...subject, name, updatedAt: timestamp } : subject) });
+      updateData({ ...current, subjects: current.subjects.map((subject) => subject.id === subjectId ? { ...subject, name, updatedAt: timestamp } : subject) });
       notify("Đã đổi tên môn học.");
     }
     setSubjectModal(null);
   };
 
   const toggleSubject = (subject: Subject) => {
-    updateData({ ...data, subjects: data.subjects.map((item) => item.id === subject.id ? { ...item, active: !item.active, updatedAt: new Date().toISOString() } : item) });
+    const current = latestDataRef.current;
+    updateData({ ...current, subjects: current.subjects.map((item) => item.id === subject.id ? { ...item, active: !item.active, updatedAt: new Date().toISOString() } : item) });
     notify(subject.active ? "Đã tạm ngưng môn học." : "Đã bật lại môn học.");
   };
 
   const saveLesson = (lesson: Lesson) => {
+    const current = latestDataRef.current;
     const timestamp = new Date().toISOString();
-    const exists = data.lessons.some((item) => item.id === lesson.id);
+    const exists = current.lessons.some((item) => item.id === lesson.id);
     const normalized = { ...lesson, durationMinutes: Number(lesson.durationMinutes) || 0, fee: Number(lesson.fee) || 0, updatedAt: timestamp };
-    updateData({ ...data, lessons: exists ? data.lessons.map((item) => item.id === lesson.id ? normalized : item) : [...data.lessons, { ...normalized, createdAt: timestamp }] });
+    updateData({ ...current, lessons: exists ? current.lessons.map((item) => item.id === lesson.id ? normalized : item) : [...current.lessons, { ...normalized, createdAt: timestamp }] });
     setLessonModal(null);
     notify(exists ? "Đã cập nhật buổi dạy." : "Đã lưu buổi dạy vào sổ.");
   };
@@ -296,9 +323,34 @@ export function useAppStore(accountId: string | null) {
 
   const removeLesson = () => {
     if (!confirmDelete) return;
-    updateData({ ...data, lessons: data.lessons.filter((lesson) => lesson.id !== confirmDelete.id) });
+    const current = latestDataRef.current;
+    updateData({ ...current, lessons: current.lessons.filter((lesson) => lesson.id !== confirmDelete.id) });
     setConfirmDelete(null);
     notify("Đã xóa buổi dạy.");
+  };
+
+  // Only students already marked as no longer studying can be deleted. Their
+  // subject assignments and lessons go with them; the queued snapshot then
+  // removes those rows from Google Sheet on the next sync.
+  const removeStudent = () => {
+    if (!confirmDeleteStudent) return;
+    const current = latestDataRef.current;
+    const studentId = confirmDeleteStudent.id;
+    const student = current.students.find((item) => item.id === studentId);
+    setConfirmDeleteStudent(null);
+    if (!student) return;
+    if (student.active) {
+      notify("Chỉ xóa được học sinh đã cho nghỉ học.", "error");
+      return;
+    }
+    updateData({
+      ...current,
+      students: current.students.filter((item) => item.id !== studentId),
+      studentSubjects: current.studentSubjects.filter((item) => item.studentId !== studentId),
+      lessons: current.lessons.filter((lesson) => lesson.studentId !== studentId),
+    });
+    if (selectedStudentId === studentId) setSelectedStudentId(null);
+    notify(`Đã xóa học sinh ${student.name} và các buổi học liên quan.`);
   };
 
   const openRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -359,6 +411,7 @@ export function useAppStore(accountId: string | null) {
     lessonModal, setLessonModal, studentModal, setStudentModal, studentDraft, setStudentDraft,
     subjectModal, setSubjectModal, subjectName, setSubjectName,
     receiptTarget, setReceiptTarget, notice, confirmDelete, setConfirmDelete,
+    confirmDeleteStudent, setConfirmDeleteStudent, removeStudent,
     restoreRef, todayLessons,
     storageStatus, refreshRemoteData,
     openStudent, saveStudent, toggleStudentActive,

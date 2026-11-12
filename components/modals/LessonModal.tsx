@@ -24,8 +24,10 @@ export function LessonModal({ data, initial, onClose, onSave }: { data: AppData;
   const [duration, setDuration] = useState(String(initial?.durationMinutes ?? config?.defaultDurationMinutes ?? 90));
   const [fee, setFee] = useState(String(initial?.fee ?? config?.defaultFee ?? 0));
   const [note, setNote] = useState(initial?.note ?? "");
+  // Fixed for this modal so a repeated tap on Save cannot add a second lesson.
+  const [lessonId] = useState(() => initial?.id ?? uid("lesson"));
   const setStudent = (id: string) => { setStudentId(id); const next = data.studentSubjects.find((item) => item.studentId === id && item.active); setSubjectId(next?.subjectId ?? ""); setDuration(String(next?.defaultDurationMinutes ?? 90)); setFee(String(next?.defaultFee ?? 0)); };
-  const submit = () => { if (!studentId || !subjectId || !lessonDate || !startTime) return; onSave({ id: initial?.id ?? uid("lesson"), studentId, subjectId, lessonDate, startTime, durationMinutes: Number(duration) || 0, fee: Number(fee) || 0, paid: initial?.paid ?? false, note: note.trim(), createdAt: initial?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString() }); };
+  const submit = () => { if (!studentId || !subjectId || !lessonDate || !startTime) return; onSave({ id: lessonId, studentId, subjectId, lessonDate, startTime, durationMinutes: Number(duration) || 0, fee: Number(fee) || 0, paid: initial?.paid ?? false, note: note.trim(), createdAt: initial?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString() }); };
   const changeSubject = (id: string) => {
     setSubjectId(id);
     const next = data.studentSubjects.find((item) => item.studentId === studentId && item.subjectId === id);
