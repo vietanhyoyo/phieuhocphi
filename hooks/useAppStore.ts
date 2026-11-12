@@ -155,13 +155,24 @@ export function useAppStore(accountId: string | null) {
   const refreshRemoteDataNow = async (fallbackData: AppData, ownerId: string) => {
     if (!ownerId) return;
     setStorageStatus("checking");
+    // The read runs in the same queue as saves, never alongside one. A save
+    // that finished while a read was in flight would move the sync baseline
+    // past the read's older server copy, so records deleted by that save
+    // would look new on the server and be brought back.
+    const readTask = saveQueueRef.current.then(() => loadAndMergeRemote(fallbackData, ownerId));
+    saveQueueRef.current = readTask.then(() => undefined);
+    if (await readTask) await queueRemoteSave(ownerId);
+  };
+
+  // Returns true when the merged data still has to be pushed to the server.
+  const loadAndMergeRemote = async (fallbackData: AppData, ownerId: string): Promise<boolean> => {
     try {
       const remote = await loadRemoteData();
-      if (ownerId !== activeAccountRef.current) return;
+      if (ownerId !== activeAccountRef.current) return false;
       if (!remote.configured) {
         cloudEnabledRef.current = false;
         setStorageStatus("local");
-        return;
+        return false;
       }
       cloudEnabledRef.current = true;
       const pending = loadPendingSave(ownerId);
@@ -177,13 +188,13 @@ export function useAppStore(accountId: string | null) {
         if (pending) clearPendingSave(ownerId, pending.revision);
         saveSyncedData(ownerId, merged);
         setStorageStatus("cloud");
-      } else {
-        stagePendingSave(ownerId, merged);
-        await queueRemoteSave(ownerId);
+        return false;
       }
+      stagePendingSave(ownerId, merged);
+      return true;
     } catch {
-      if (ownerId !== activeAccountRef.current) return;
-      setStorageStatus("error");
+      if (ownerId === activeAccountRef.current) setStorageStatus("error");
+      return false;
     }
   };
 
