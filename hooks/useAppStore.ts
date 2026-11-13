@@ -79,20 +79,26 @@ export function useAppStore(accountId: string | null) {
   useEffect(() => {
     if (!accountId) return;
     // Besides retrying failed saves, pull changes made on other devices when
-    // the user comes back to this tab and once a minute while it is open.
+    // the user comes back to this page and every 30 seconds while it is open.
+    // Two windows side by side are both "visible", so switching between them
+    // only fires focus, not visibilitychange.
     const refresh = (minAgeMs: number) => {
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
       const due = Date.now() - lastRefreshRef.current >= minAgeMs;
       if (due || loadPendingSave(accountId) || storageStatus === "error") void refreshRemoteData(latestDataRef.current, accountId);
     };
-    const retry = () => refresh(5000);
-    const tick = () => refresh(60000);
-    window.addEventListener("online", retry);
-    document.addEventListener("visibilitychange", retry);
-    const timer = window.setInterval(tick, 30000);
+    const comeBack = () => refresh(2000);
+    const tick = () => refresh(30000);
+    window.addEventListener("online", comeBack);
+    window.addEventListener("focus", comeBack);
+    window.addEventListener("pageshow", comeBack);
+    document.addEventListener("visibilitychange", comeBack);
+    const timer = window.setInterval(tick, 10000);
     return () => {
-      window.removeEventListener("online", retry);
-      document.removeEventListener("visibilitychange", retry);
+      window.removeEventListener("online", comeBack);
+      window.removeEventListener("focus", comeBack);
+      window.removeEventListener("pageshow", comeBack);
+      document.removeEventListener("visibilitychange", comeBack);
       window.clearInterval(timer);
     };
   }, [accountId, storageStatus]);
