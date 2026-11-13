@@ -4,7 +4,31 @@
 
 `https://docs.google.com/spreadsheets/d/1zBAWSnDb0h1oLsTkJzgclUXHtUrcG8FSIQ32NJ1jiDI/edit`
 
-## 1. Tạo Apps Script cho sheet
+## Cách nhanh nhất: Google Sheets API (service account)
+
+App gọi thẳng Google Sheets API, đọc cả 8 bảng trong một request và chỉ ghi những bảng thay đổi. Không tốn phí. Khi đã cấu hình, phần Apps Script bên dưới không còn cần thiết (có thể giữ để dự phòng).
+
+1. Mở <https://console.cloud.google.com/>, tạo một project mới (hoặc chọn project có sẵn).
+2. Vào `APIs & Services > Library`, tìm **Google Sheets API** và bấm **Enable**.
+3. Vào `IAM & Admin > Service Accounts > Create service account`. Đặt tên bất kỳ (ví dụ `so-hoc-phi`), bỏ qua phần cấp quyền, bấm **Done**.
+4. Mở service account vừa tạo, tab `Keys > Add key > Create new key > JSON`. Một file JSON sẽ được tải về.
+5. Mở Google Sheet, bấm **Share**, dán email của service account (dạng `ten@project.iam.gserviceaccount.com`, có trong file JSON ở trường `client_email`), chọn quyền **Editor**, bỏ chọn gửi thông báo, bấm **Share**.
+6. Thêm vào `.env.local`:
+
+```env
+GOOGLE_SERVICE_ACCOUNT_EMAIL=giá_trị_client_email
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="giá_trị_private_key"
+GOOGLE_SHEET_ID=1zBAWSnDb0h1oLsTkJzgclUXHtUrcG8FSIQ32NJ1jiDI
+AUTH_SECRET=giữ_nguyên_giá_trị_cũ
+```
+
+`private_key` trong file JSON là một dòng có các ký tự `\n`; chép nguyên dòng đó, kể cả `-----BEGIN PRIVATE KEY-----` và `-----END PRIVATE KEY-----`, đặt trong dấu ngoặc kép. Không đưa file JSON hoặc `.env.local` lên Git.
+
+7. Khởi động lại `npm run dev`. Khi deploy (ví dụ Vercel), thêm hai biến trên vào Environment Variables của project.
+
+Bảng, cột và dữ liệu giữ nguyên như khi dùng Apps Script, nên hai cách đọc được dữ liệu của nhau.
+
+## 1. Tạo Apps Script cho sheet (cách cũ)
 
 1. Mở sheet, chọn `Extensions > Apps Script`.
 2. Xóa nội dung file mặc định và dán toàn bộ file `google-apps-script/Code.gs`.

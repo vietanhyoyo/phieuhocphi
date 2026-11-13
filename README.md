@@ -14,6 +14,10 @@ Mở [http://localhost:3000](http://localhost:3000).
 
 ## Cấu hình Google Sheets
 
+**Khuyến nghị: Google Sheets API (service account)** — nhanh hơn Apps Script nhiều lần. Tạo service account, chia sẻ Sheet cho email của nó với quyền Editor, rồi điền `GOOGLE_SERVICE_ACCOUNT_EMAIL` và `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` vào `.env.local`. Khi hai biến này có giá trị, app gọi thẳng Sheets API và bỏ qua Apps Script.
+
+**Cách cũ: Apps Script** (dùng khi chưa có service account):
+
 1. Mở Google Sheet và tạo Apps Script từ file [`google-apps-script/Code.gs`](./google-apps-script/Code.gs).
 2. Triển khai Apps Script dưới dạng Web App, quyền truy cập **Anyone**.
 3. Điền URL triển khai, mã bí mật và `AUTH_SECRET` vào `.env.local`.

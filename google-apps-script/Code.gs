@@ -1,5 +1,6 @@
 const DEFAULT_SPREADSHEET_ID = "1zBAWSnDb0h1oLsTkJzgclUXHtUrcG8FSIQ32NJ1jiDI";
 const SYNC_SECRET_PROPERTY = "TUTOR_SYNC_SECRET";
+const LEGACY_CLAIMED_PROPERTY = "LEGACY_DATA_CLAIMED";
 
 // Keep the existing userId column position in App_Lessons so older sheets
 // remain readable; the payment flag is appended after it.
@@ -161,9 +162,18 @@ function setupBankAccounts() {
   }
 }
 
+// Global scope is re-evaluated on every execution, so these caches live for
+// a single request only. They avoid reopening the spreadsheet for each table
+// and each date/time cell.
+var spreadsheetCache_ = null;
+var timeZoneCache_ = null;
+
 function spreadsheet_() {
-  const id = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || DEFAULT_SPREADSHEET_ID;
-  return SpreadsheetApp.openById(id);
+  if (!spreadsheetCache_) {
+    const id = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID") || DEFAULT_SPREADSHEET_ID;
+    spreadsheetCache_ = SpreadsheetApp.openById(id);
+  }
+  return spreadsheetCache_;
 }
 
 function readAppData_(userId) {
@@ -185,14 +195,25 @@ function readUserTable_(table, userId) {
   return dedupeById_(readTable_(table).filter((item) => String(item.userId || "").trim() === userId));
 }
 
+// Legacy rows (no userId) only come from the pre-multi-account version, so
+// this check runs until it has been done once, then is skipped on every load.
 function migrateSingleAccountLegacyData_(userId) {
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(LEGACY_CLAIMED_PROPERTY) === "1") return;
   const users = readTable_(TABLES.users);
+  if (users.length > 1) {
+    properties.setProperty(LEGACY_CLAIMED_PROPERTY, "1");
+    return;
+  }
   if (users.length !== 1 || String(users[0].id) !== userId) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     const currentUsers = readTable_(TABLES.users);
-    if (currentUsers.length === 1 && String(currentUsers[0].id) === userId) claimLegacyData_(userId);
+    if (currentUsers.length === 1 && String(currentUsers[0].id) === userId) {
+      claimLegacyData_(userId);
+      properties.setProperty(LEGACY_CLAIMED_PROPERTY, "1");
+    }
   } finally {
     lock.releaseLock();
   }
@@ -204,14 +225,15 @@ function saveAppData_(userId, data) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    writeTable_(TABLES.meta, [{ key: "version", value: data.version }, { key: "updatedAt", value: new Date().toISOString() }]);
-    mergeUserTable_(TABLES.subjects, userId, data.subjects);
-    mergeUserTable_(TABLES.students, userId, data.students);
-    mergeUserTable_(TABLES.studentSubjects, userId, data.studentSubjects);
-    mergeUserTable_(TABLES.lessons, userId, data.lessons);
+    let changed = false;
+    changed = mergeUserTable_(TABLES.subjects, userId, data.subjects) || changed;
+    changed = mergeUserTable_(TABLES.students, userId, data.students) || changed;
+    changed = mergeUserTable_(TABLES.studentSubjects, userId, data.studentSubjects) || changed;
+    changed = mergeUserTable_(TABLES.lessons, userId, data.lessons) || changed;
     // Older clients omit these fields: preserve the existing weekly schedule.
-    if (Array.isArray(data.timetable)) mergeUserTable_(TABLES.timetable, userId, data.timetable);
-    if (typeof data.timetableTitle === "string") mergeUserTable_(TABLES.timetableSettings, userId, [{ id: "title", title: data.timetableTitle }]);
+    if (Array.isArray(data.timetable)) changed = mergeUserTable_(TABLES.timetable, userId, data.timetable) || changed;
+    if (typeof data.timetableTitle === "string") changed = mergeUserTable_(TABLES.timetableSettings, userId, [{ id: "title", title: data.timetableTitle }]) || changed;
+    if (changed) writeTable_(TABLES.meta, [{ key: "version", value: data.version }, { key: "updatedAt", value: new Date().toISOString() }]);
   } finally {
     lock.releaseLock();
   }
@@ -248,11 +270,36 @@ function setupTimetable() {
   } finally { lock.releaseLock(); }
 }
 
+// Returns true when the sheet was rewritten. Unchanged tables are skipped,
+// since clearing and rewriting a whole sheet is the slowest part of a save.
 function mergeUserTable_(table, userId, records) {
   const allRecords = readTable_(table);
   const otherAccounts = allRecords.filter((record) => String(record.userId || "").trim() !== userId);
   const accountRecords = dedupeById_((records || []).map((record) => Object.assign({}, record, { userId })));
-  writeTable_(table, otherAccounts.concat(accountRecords));
+  const nextRecords = otherAccounts.concat(accountRecords);
+  if (sameRows_(table, allRecords, nextRecords)) return false;
+  writeTable_(table, nextRecords);
+  return true;
+}
+
+// Compares records the way writeTable_ would store them. Any doubt (for
+// example a Date cell against a string) counts as a change, so a needed write
+// is never skipped.
+function sameRows_(table, current, next) {
+  if (current.length !== next.length) return false;
+  const cell = (value) => {
+    if (value === undefined || value === null) return "";
+    if (Object.prototype.toString.call(value) === "[object Date]") return isNaN(value.getTime()) ? "" : value.toISOString();
+    // Sheets turns "5"/"true" input into 5/true, so string form is enough.
+    return String(value);
+  };
+  for (let row = 0; row < current.length; row++) {
+    for (let col = 0; col < table.headers.length; col++) {
+      const header = table.headers[col];
+      if (cell(current[row][header]) !== cell(next[row][header])) return false;
+    }
+  }
+  return true;
 }
 
 function dedupeById_(records) {
@@ -301,7 +348,8 @@ function writeTable_(table, records) {
 }
 
 function spreadsheetTimeZone_() {
-  return spreadsheet_().getSpreadsheetTimeZone() || Session.getScriptTimeZone() || "Asia/Ho_Chi_Minh";
+  if (!timeZoneCache_) timeZoneCache_ = spreadsheet_().getSpreadsheetTimeZone() || Session.getScriptTimeZone() || "Asia/Ho_Chi_Minh";
+  return timeZoneCache_;
 }
 
 function pad2_(value) {

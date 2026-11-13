@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { callAppsScript, isCloudStorageConfigured } from "@/lib/server-sheets";
+import { callSheets, isCloudStorageConfigured } from "@/lib/server-sheets";
 import { clearSession, getSession, hashPassword, isAuthConfigured, publicUser, setSession, UserRecord, verifyPassword } from "@/lib/server-auth";
 
 function normalizeUsername(value: unknown) {
@@ -21,9 +21,13 @@ export async function GET() {
   if (!isCloudStorageConfigured() || !isAuthConfigured()) {
     return NextResponse.json({ configured: false, authenticated: true, user: null, hasUsers: false });
   }
+  // A valid signed session proves an account exists, so the Google Sheet round
+  // trip (only needed to choose between login and register) can be skipped.
+  const session = await getSession();
+  if (session) return NextResponse.json({ configured: true, authenticated: true, user: session, hasUsers: true });
   try {
-    const [session, result] = await Promise.all([getSession(), callAppsScript({ action: "listUsers" })]);
-    return NextResponse.json({ configured: true, authenticated: Boolean(session), user: session, hasUsers: Boolean(result.hasUsers) });
+    const result = await callSheets({ action: "listUsers" });
+    return NextResponse.json({ configured: true, authenticated: false, user: null, hasUsers: Boolean(result.hasUsers) });
   } catch (error) {
     return NextResponse.json({ configured: true, authenticated: false, user: null, hasUsers: false, message: error instanceof Error ? error.message : "Không thể kiểm tra tài khoản." }, { status: 502 });
   }
@@ -36,11 +40,11 @@ export async function POST(request: Request) {
     const username = normalizeUsername(body.username);
     if (!username || !validPassword(body.password)) return NextResponse.json({ message: "Tên đăng nhập và mật khẩu tối thiểu 8 ký tự là bắt buộc." }, { status: 400 });
 
-    const found = asUser((await callAppsScript({ action: "findUser", username })).user);
+    const found = asUser((await callSheets({ action: "findUser", username })).user);
     if (body.action === "register") {
       if (found) return NextResponse.json({ message: "Tên đăng nhập đã tồn tại." }, { status: 409 });
       const password = hashPassword(body.password);
-      const created = asUser((await callAppsScript({
+      const created = asUser((await callSheets({
         action: "createUser",
         user: { id: `user-${crypto.randomUUID()}`, username, passwordHash: password.hash, passwordSalt: password.salt, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
       })).user);
@@ -79,14 +83,14 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const found = asUser((await callAppsScript({ action: "findUser", username: normalizeUsername(session.username) })).user);
+    const found = asUser((await callSheets({ action: "findUser", username: normalizeUsername(session.username) })).user);
     if (!found || found.id !== session.id) return NextResponse.json({ message: "Không tìm thấy tài khoản." }, { status: 401 });
     if (!verifyPassword(body.currentPassword, found)) {
       return NextResponse.json({ message: "Mật khẩu hiện tại không đúng." }, { status: 401 });
     }
 
     const password = hashPassword(body.newPassword);
-    const result = await callAppsScript({
+    const result = await callSheets({
       action: "updateUserPassword",
       userId: session.id,
       expectedPasswordHash: found.passwordHash,

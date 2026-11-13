@@ -138,13 +138,13 @@ test('Apps Script sends every collection and the timetable title to its Sheet ta
   vm.runInNewContext(`${source}\nglobalThis.saveForTest = function(data) {
     var writes = [];
     writeTable_ = function(table, records) { writes.push({ name: table.name, records: records }); };
-    mergeUserTable_ = function(table, userId, records) { writes.push({ name: table.name, records: records }); };
+    mergeUserTable_ = function(table, userId, records) { writes.push({ name: table.name, records: records }); return true; };
     saveAppData_('user-a', data);
     return writes;
   };`, context);
   const writes = context.saveForTest(fullData());
   const names = Array.from(writes, (write) => write.name);
-  assert.deepEqual(names, ['App_Meta', 'App_Subjects', 'App_Students', 'App_StudentSubjects', 'App_Lessons', 'App_Timetable', 'App_TimetableSettings']);
+  assert.deepEqual(names, ['App_Subjects', 'App_Students', 'App_StudentSubjects', 'App_Lessons', 'App_Timetable', 'App_TimetableSettings', 'App_Meta']);
   assert.equal(writes.find((write) => write.name === 'App_TimetableSettings').records[0].title, 'Lịch của Bình');
   assert.equal(writes.find((write) => write.name === 'App_Lessons').records[0].paid, true);
 });
@@ -224,4 +224,25 @@ test('Apps Script drops rows missing from an account save but keeps other accoun
     [{ id: 'stay' }],
   );
   assert.equal(Array.from(written, (row) => `${row.userId}:${row.id}`).sort().join(), 'user-a:stay,user-b:other');
+});
+
+test('Apps Script skips rewriting tables and meta when an account save changes nothing', () => {
+  const source = readFileSync(path.join(__dirname, '../google-apps-script/Code.gs'), 'utf8');
+  const context = { LockService: { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) } };
+  vm.runInNewContext(`${source}\nglobalThis.saveTwice = function(data) {
+    var stored = {}, writes = [];
+    readTable_ = function(table) { return stored[table.name] || []; };
+    writeTable_ = function(table, records) {
+      writes.push(table.name);
+      stored[table.name] = records.map(function(record) { var row = {}; table.headers.forEach(function(h) { row[h] = record[h] === undefined ? '' : record[h]; }); return row; });
+    };
+    saveAppData_('user-a', data);
+    var first = writes.length;
+    writes = [];
+    saveAppData_('user-a', data);
+    return { first: first, second: writes };
+  };`, context);
+  const result = context.saveTwice(fullData());
+  assert.ok(result.first > 0);
+  assert.deepEqual(Array.from(result.second), []);
 });
