@@ -2,15 +2,22 @@
 // directly. Table layout and rules must stay identical to Code.gs so either
 // backend can read what the other wrote.
 
+import { ChangeSet, Collection, parseChangeSet } from "./change-set";
+
 export type TableDef = { name: string; headers: string[] };
 export type SheetRecord = Record<string, unknown>;
 export type TableWrite = { table: TableDef; rows: unknown[][]; previousRowCount: number };
+// Row-level edit of one tab. Row numbers are 0-based and refer to the tab as
+// it was read; `set` rows past the end are appended.
+export type RowChange = { table: TableDef; set: { row: number; values: unknown[] }[]; remove: number[] };
 
 // Reads always return the raw cell rows (header included) of every table asked
 // for, in one round trip. Missing tabs come back as [].
 export interface SheetsBackend {
   read(tables: TableDef[]): Promise<{ values: unknown[][][]; timeZone: string }>;
   write(changes: TableWrite[]): Promise<void>;
+  // Applies every row change in one atomic request.
+  applyRows(changes: RowChange[]): Promise<void>;
 }
 
 export const TABLES = {
@@ -227,6 +234,60 @@ async function saveData(backend: SheetsBackend, userId: string, data: SheetRecor
   });
 }
 
+const COLLECTION_TABLES: Record<Collection, TableDef> = {
+  subjects: TABLES.subjects,
+  students: TABLES.students,
+  studentSubjects: TABLES.studentSubjects,
+  lessons: TABLES.lessons,
+  timetable: TABLES.timetable,
+};
+
+// Edits only the rows of this account that the change set names: replaced
+// records are rewritten in place, new ones appended, deleted ones removed.
+// Other rows, including other accounts, are never touched.
+async function applyChanges(backend: SheetsBackend, userId: string, changes: ChangeSet) {
+  if (changes.timetable) validateTimetable({ timetable: changes.timetable.upsert });
+  if (changes.timetableTitle !== undefined) validateTimetable({ timetableTitle: changes.timetableTitle });
+  const plan = new Map<TableDef, { upsert: SheetRecord[]; delete: string[] }>();
+  for (const [collection, table] of Object.entries(COLLECTION_TABLES) as [Collection, TableDef][]) {
+    const change = changes[collection];
+    if (change && (change.upsert.length || change.delete.length)) plan.set(table, change);
+  }
+  if (changes.timetableTitle !== undefined) plan.set(TABLES.timetableSettings, { upsert: [{ id: "title", title: changes.timetableTitle }], delete: [] });
+  if (!plan.size) return;
+
+  await withLock(async () => {
+    const tables = [...plan.keys()];
+    const { values } = await backend.read(tables);
+    const rowChanges = tables.map((table, index): RowChange => {
+      const rows = values[index] ?? [];
+      const change = plan.get(table)!;
+      const ownerColumn = table.headers.indexOf("userId");
+      const rowsById = new Map<string, number[]>();
+      rows.forEach((row, rowIndex) => {
+        if (rowIndex === 0 || String(row[ownerColumn] ?? "").trim() !== userId) return;
+        const id = String(row[0] ?? "").trim();
+        if (id) rowsById.set(id, [...(rowsById.get(id) ?? []), rowIndex]);
+      });
+      const set: RowChange["set"] = rows.length ? [] : [{ row: 0, values: table.headers }];
+      const remove = new Set<number>();
+      let nextRow = Math.max(rows.length, 1);
+      for (const record of dedupeById(change.upsert)) {
+        const cells = table.headers.map((header) => {
+          const value = header === "userId" ? userId : record[header];
+          return value === undefined || value === null ? "" : value;
+        });
+        const [first, ...duplicates] = rowsById.get(String(record.id).trim()) ?? [];
+        set.push({ row: first ?? nextRow++, values: cells });
+        duplicates.forEach((row) => remove.add(row));
+      }
+      for (const id of change.delete) (rowsById.get(id.trim()) ?? []).forEach((row) => remove.add(row));
+      return { table, set, remove: [...remove] };
+    }).filter((change) => change.set.length || change.remove.length);
+    await backend.applyRows(rowChanges);
+  });
+}
+
 export function bankAccountForUsername(username: unknown) {
   return String(username ?? "").trim().toLowerCase() === "khadang2004cm@gmail.com"
     ? { bankName: "MB BANK", bankAccountName: "DANG VU KHA", bankAccountNumber: "20402023979", bankQrImage: "/dang-vu-kha-qr.png" }
@@ -276,6 +337,12 @@ export async function handleSheetsAction(backend: SheetsBackend, payload: SheetR
   if (action === "loadData") return { ok: true, data: await loadData(backend, requiredUserId(payload)) };
   if (action === "saveData") {
     await saveData(backend, requiredUserId(payload), payload.data as SheetRecord);
+    return { ok: true };
+  }
+  if (action === "applyChanges") {
+    const changes = parseChangeSet(payload.changes);
+    if (!changes) throw new Error("Dữ liệu thay đổi không hợp lệ.");
+    await applyChanges(backend, requiredUserId(payload), changes);
     return { ok: true };
   }
   if (action === "listUsers") {

@@ -1,5 +1,6 @@
 import { AppData } from "@/lib/types";
 import { isValidAppData, normalizeAppData } from "@/lib/storage";
+import { ChangeSet } from "@/lib/change-set";
 
 type RemoteLoadResult = {
   configured: boolean;
@@ -19,11 +20,11 @@ export async function loadRemoteData(): Promise<RemoteLoadResult> {
   return { configured: Boolean(body.configured), data: body.data ? normalizeAppData(body.data) : null };
 }
 
-export async function saveRemoteData(data: AppData, accountId: string) {
+export async function saveRemoteChanges(changes: ChangeSet, accountId: string) {
   const response = await fetch("/api/sheets", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ data: normalizeAppData(data), accountId }),
+    body: JSON.stringify({ changes, accountId }),
   });
   await parseResponse(response);
 }

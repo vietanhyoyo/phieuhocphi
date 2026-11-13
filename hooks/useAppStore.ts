@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppData, Lesson, Notice, NoticeType, ReceiptTarget, Student, StudentDraft, StudentSubject, Subject, TimetableEntry, View } from "@/lib/types";
 import { isTimetableEntry, timetableConflict, WEEKDAYS } from "@/lib/timetable";
 import { createInitialData, isValidAppData, loadData, normalizeAppData, saveData, STORAGE_KEY } from "@/lib/storage";
-import { loadRemoteData, saveRemoteData } from "@/lib/cloud-storage";
+import { loadRemoteData, saveRemoteChanges } from "@/lib/cloud-storage";
+import { diffData, isEmptyChangeSet } from "@/lib/change-set";
 import { clearPendingSave, hasLocalData, loadPendingSave, loadSyncedData, markMisScopedSaveMigrated, reconcileData, recoverMisScopedData, sameData, saveSyncedData, stagePendingSave, wasMisScopedSaveMigrated } from "@/lib/sync-queue";
 import { loadCachedAccount } from "@/lib/account-cache";
 import { currentDate, currentMonth, emptyStudentDraft, getReceiptLessons, uid, updateReceiptLessonsPaid } from "@/lib/utils";
@@ -34,6 +35,7 @@ export function useAppStore(accountId: string | null) {
   const latestDataRef = useRef<AppData>(createInitialData());
   const saveQueueRef = useRef(Promise.resolve());
   const refreshingRef = useRef<{ ownerId: string; promise: Promise<void> } | null>(null);
+  const lastRefreshRef = useRef(0);
   const syncErrorShownRef = useRef(false);
   // IDs for a record being created are fixed when its modal opens, so a
   // repeated tap on Save updates that record instead of adding a duplicate.
@@ -76,14 +78,18 @@ export function useAppStore(accountId: string | null) {
 
   useEffect(() => {
     if (!accountId) return;
-    const retry = () => {
-      if (document.visibilityState === "visible" && navigator.onLine && (loadPendingSave(accountId) || storageStatus === "error")) {
-        void refreshRemoteData(latestDataRef.current, accountId);
-      }
+    // Besides retrying failed saves, pull changes made on other devices when
+    // the user comes back to this tab and once a minute while it is open.
+    const refresh = (minAgeMs: number) => {
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      const due = Date.now() - lastRefreshRef.current >= minAgeMs;
+      if (due || loadPendingSave(accountId) || storageStatus === "error") void refreshRemoteData(latestDataRef.current, accountId);
     };
+    const retry = () => refresh(5000);
+    const tick = () => refresh(60000);
     window.addEventListener("online", retry);
     document.addEventListener("visibilitychange", retry);
-    const timer = window.setInterval(retry, 30000);
+    const timer = window.setInterval(tick, 30000);
     return () => {
       window.removeEventListener("online", retry);
       document.removeEventListener("visibilitychange", retry);
@@ -120,8 +126,14 @@ export function useAppStore(accountId: string | null) {
         if (ownerId !== activeAccountRef.current) return false;
         const pending = loadPendingSave(ownerId);
         if (!pending) return true;
-        setStorageStatus("syncing");
-        await saveRemoteData(pending.data, ownerId);
+        // Only records added, edited or deleted on this device since the last
+        // confirmed snapshot are sent, so records changed or deleted on
+        // another device are never written back from a stale copy.
+        const changes = diffData(loadSyncedData(ownerId), pending.data);
+        if (!isEmptyChangeSet(changes)) {
+          setStorageStatus("syncing");
+          await saveRemoteChanges(changes, ownerId);
+        }
         if (ownerId !== activeAccountRef.current) return false;
         saveSyncedData(ownerId, pending.data);
         clearPendingSave(ownerId, pending.revision);
@@ -154,7 +166,9 @@ export function useAppStore(accountId: string | null) {
 
   const refreshRemoteDataNow = async (fallbackData: AppData, ownerId: string) => {
     if (!ownerId) return;
-    setStorageStatus("checking");
+    lastRefreshRef.current = Date.now();
+    // A background refresh of already synced data stays quiet in the UI.
+    setStorageStatus((current) => (current === "cloud" ? current : "checking"));
     // The read runs in the same queue as saves, never alongside one. A save
     // that finished while a read was in flight would move the sync baseline
     // past the read's older server copy, so records deleted by that save
@@ -190,6 +204,9 @@ export function useAppStore(accountId: string | null) {
         setStorageStatus("cloud");
         return false;
       }
+      // The server copy just read becomes the baseline, so the next save
+      // sends exactly what this device has that the server lacks.
+      saveSyncedData(ownerId, remote.data ?? { ...merged, subjects: [], students: [], studentSubjects: [], lessons: [], timetable: [], timetableTitle: "" });
       stagePendingSave(ownerId, merged);
       return true;
     } catch {

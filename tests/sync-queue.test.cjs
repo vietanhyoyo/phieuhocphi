@@ -246,3 +246,48 @@ test('Apps Script skips rewriting tables and meta when an account save changes n
   assert.ok(result.first > 0);
   assert.deepEqual(Array.from(result.second), []);
 });
+
+function twoDevices() {
+  const at = (updatedAt) => ({ createdAt: '2026-11-01T00:00:00.000Z', updatedAt });
+  const student = (id, name, updatedAt = '2026-11-01T00:00:00.000Z') => ({ id, name, phone: '', parentName: '', parentPhone: '', note: '', active: true, ...at(updatedAt) });
+  const synced = storage.normalizeAppData({ ...data([lesson('keep'), lesson('gone')]), students: [student('a', 'An'), student('b', 'Bình')] });
+  return { student, synced };
+}
+
+test('a student and lesson deleted on another device stay deleted on a device with old local data', () => {
+  const { synced } = twoDevices();
+  // Device A deleted student b and lesson "gone"; device B still has them unchanged.
+  const server = { ...synced, students: synced.students.filter((item) => item.id !== 'b'), lessons: synced.lessons.filter((item) => item.id !== 'gone') };
+  const merged = queue.reconcileData(synced, server, synced);
+  assert.equal(merged.students.map((item) => item.id).join(), 'a');
+  assert.equal(merged.lessons.map((item) => item.id).join(), 'keep');
+});
+
+test('a stale device keeps its own new edits while taking deletions and edits from another device', () => {
+  const { student, synced } = twoDevices();
+  const server = { ...synced, students: [student('a', 'An (sửa ở máy A)', '2026-11-05T00:00:00.000Z')] };
+  const local = { ...synced, students: [...synced.students, student('c', 'Cường', '2026-11-06T00:00:00.000Z')], lessons: [...synced.lessons, lesson('new-here')] };
+  const merged = queue.reconcileData(local, server, synced);
+  assert.equal(merged.students.map((item) => `${item.id}:${item.name}`).join(), 'a:An (sửa ở máy A),c:Cường');
+  assert.equal(merged.lessons.map((item) => item.id).sort().join(), 'gone,keep,new-here');
+});
+
+test('a local edit wins over an unchanged server copy and survives a delete on another device', () => {
+  const { student, synced } = twoDevices();
+  const server = { ...synced, students: [synced.students[0]] };
+  const local = { ...synced, students: [student('a', 'An mới', '2026-11-07T00:00:00.000Z'), student('b', 'Bình mới', '2026-11-07T00:00:00.000Z')] };
+  const merged = queue.reconcileData(local, server, synced);
+  assert.equal(merged.students.map((item) => item.name).join(), 'An mới,Bình mới');
+});
+
+test('an empty server copy never wipes this device', () => {
+  const { synced } = twoDevices();
+  assert.equal(queue.reconcileData(synced, null, synced).students.length, 2);
+});
+
+test('the timetable title follows whichever side changed it', () => {
+  const { synced } = twoDevices();
+  const base = { ...synced, timetableTitle: 'Lịch' };
+  assert.equal(queue.reconcileData(base, { ...base, timetableTitle: 'Lịch mới' }, base).timetableTitle, 'Lịch mới');
+  assert.equal(queue.reconcileData({ ...base, timetableTitle: 'Lịch của tôi' }, base, base).timetableTitle, 'Lịch của tôi');
+});

@@ -59,23 +59,56 @@ export function markMisScopedSaveMigrated(scope: string, revision: string) {
   window.localStorage.setItem(migratedLocalKey(scope), `${MISSCOPED_MIGRATION_VERSION}:${revision}`);
 }
 
-function mergeRecords<T extends { id: string }>(local: T[], remote: T[], previous: T[]): T[] {
-  const previousIds = new Set(previous.map((record) => record.id));
+type SyncedRecord = { id: string; updatedAt?: string };
+
+// Every edit in the app stamps updatedAt, so it identifies a record's
+// version. Records without one fall back to their full content.
+function recordVersion(record: SyncedRecord) {
+  if (record.updatedAt) return String(record.updatedAt);
+  const { userId: _owner, ...rest } = record as SyncedRecord & { userId?: unknown };
+  return JSON.stringify(Object.keys(rest).sort().map((key) => [key, (rest as Record<string, unknown>)[key] ?? ""]));
+}
+
+const newer = <T extends SyncedRecord>(local: T, remote: T) => (String(remote.updatedAt ?? "") > String(local.updatedAt ?? "") ? remote : local);
+
+// Three-way merge against the last snapshot both sides agreed on (base):
+// - a record unchanged on one side takes the other side's version;
+// - a record missing on one side but unchanged on the other since the base
+//   was deleted there, so it stays deleted (on this device or another one);
+// - a record new on either side is kept; a delete never beats a later edit.
+function mergeRecords<T extends SyncedRecord>(local: T[], remote: T[], base: T[]): T[] {
+  const remoteById = new Map(remote.map((record) => [record.id, record]));
+  const baseById = new Map(base.map((record) => [record.id, record]));
+  const changed = (record: T, baseRecord: T | undefined) => !baseRecord || recordVersion(record) !== recordVersion(baseRecord);
   const seen = new Set<string>();
   const records: T[] = [];
   for (const record of local) {
-    if (!seen.has(record.id)) { records.push(record); seen.add(record.id); }
+    if (seen.has(record.id)) continue;
+    seen.add(record.id);
+    const remoteRecord = remoteById.get(record.id);
+    const baseRecord = baseById.get(record.id);
+    if (remoteRecord) {
+      if (!baseRecord) records.push(newer(record, remoteRecord));
+      else if (!changed(record, baseRecord)) records.push(remoteRecord);
+      else if (!changed(remoteRecord, baseRecord)) records.push(record);
+      else records.push(newer(record, remoteRecord));
+    } else if (changed(record, baseRecord)) {
+      records.push(record);
+    }
   }
   for (const record of remote) {
-    if (!seen.has(record.id) && !previousIds.has(record.id)) { records.push(record); seen.add(record.id); }
+    if (seen.has(record.id)) continue;
+    seen.add(record.id);
+    if (changed(record, baseById.get(record.id))) records.push(record);
   }
   return records;
 }
 
-// Local records win on ID conflicts. A record absent locally but present in
-// the last confirmed snapshot was deleted locally, so it must not reappear.
+// An empty server copy (null) is never read as "everything was deleted":
+// that would wipe this device if the sheet were cleared or replaced.
 export function reconcileData(local: AppData, remote: AppData | null, lastSynced: AppData | null): AppData {
   if (!remote) return normalizeAppData(local);
+  const titleChangedHere = !lastSynced || local.timetableTitle !== lastSynced.timetableTitle;
   return normalizeAppData({
     ...local,
     subjects: mergeRecords(local.subjects, remote.subjects, lastSynced?.subjects || []),
@@ -83,6 +116,7 @@ export function reconcileData(local: AppData, remote: AppData | null, lastSynced
     studentSubjects: mergeRecords(local.studentSubjects, remote.studentSubjects, lastSynced?.studentSubjects || []),
     lessons: mergeRecords(local.lessons, remote.lessons, lastSynced?.lessons || []),
     timetable: mergeRecords(local.timetable || [], remote.timetable || [], lastSynced?.timetable || []),
+    timetableTitle: titleChangedHere ? local.timetableTitle : remote.timetableTitle,
   });
 }
 

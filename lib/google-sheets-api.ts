@@ -116,11 +116,19 @@ export async function batchClearValues(spreadsheetId: string, ranges: string[]) 
   });
 }
 
+// Cached sheet sizes stay valid unless rows, columns or tabs change.
+const STRUCTURAL = ["addSheet", "appendDimension", "deleteDimension", "insertDimension", "deleteSheet"];
+
 export async function batchUpdateSpreadsheet(spreadsheetId: string, requests: object[]) {
   if (!requests.length) return;
-  await request(`${SHEETS_API}/${encodeURIComponent(spreadsheetId)}:batchUpdate`, {
-    method: "POST",
-    body: JSON.stringify({ requests }),
-  });
-  metadataCache.delete(spreadsheetId);
+  try {
+    await request(`${SHEETS_API}/${encodeURIComponent(spreadsheetId)}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({ requests }),
+    });
+  } catch (error) {
+    metadataCache.delete(spreadsheetId);
+    throw error;
+  }
+  if (requests.some((item) => STRUCTURAL.some((key) => key in item))) metadataCache.delete(spreadsheetId);
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isValidAppData } from "@/lib/storage";
+import { parseChangeSet } from "@/lib/change-set";
 import { callSheets, isCloudStorageConfigured } from "@/lib/server-sheets";
 import { getSession, isAuthConfigured } from "@/lib/server-auth";
 
@@ -23,10 +24,18 @@ export async function POST(request: Request) {
   if (isAuthConfigured() && !session) return NextResponse.json({ message: "Bạn cần đăng nhập để lưu dữ liệu." }, { status: 401 });
 
   try {
-    const body = (await request.json()) as { data?: unknown; accountId?: unknown };
+    const body = (await request.json()) as { data?: unknown; changes?: unknown; accountId?: unknown };
     if (body.accountId !== (session?.id || "local")) return NextResponse.json({ message: "Tài khoản đồng bộ không khớp." }, { status: 403 });
+    const userId = session?.id || "local";
+    if (body.changes !== undefined) {
+      const changes = parseChangeSet(body.changes);
+      if (!changes) return NextResponse.json({ message: "Dữ liệu thay đổi không hợp lệ." }, { status: 400 });
+      await callSheets({ action: "applyChanges", userId, changes });
+      return NextResponse.json({ ok: true });
+    }
+    // Whole snapshots still come from tabs opened before the update.
     if (!isValidAppData(body.data)) return NextResponse.json({ message: "Dữ liệu ứng dụng không hợp lệ." }, { status: 400 });
-    await callSheets({ action: "saveData", userId: session?.id || "local", data: body.data });
+    await callSheets({ action: "saveData", userId, data: body.data });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "Không thể lưu dữ liệu vào Google Sheet." }, { status: 502 });
