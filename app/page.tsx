@@ -19,6 +19,7 @@ import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { exportBackup } from "@/lib/storage";
 import { useAppStore } from "@/hooks/useAppStore";
 import { AuthView } from "@/components/views/AuthView";
+import { ScrollToTopButton } from "@/components/shared/ScrollToTopButton";
 import { AuthUser } from "@/lib/types";
 import { cacheAccount, clearCachedAccount, loadCachedAccount } from "@/lib/account-cache";
 
@@ -115,6 +116,7 @@ export default function Page() {
       <input ref={app.restoreRef} className="hidden" type="file" accept="application/json,.json" onChange={app.openRestore} />
 
       {(app.storageStatus === "checking" || app.storageStatus === "syncing") && <div className="sheet-loading-indicator" role="status" aria-live="polite"><LoaderCircle size={15} className="sheet-loading-spinner" /><span>{app.storageStatus === "checking" ? "Đang tải dữ liệu…" : "Đang lưu vào Google Sheet…"}</span></div>}
+      <ScrollToTopButton className={app.view === "settings" ? "is-without-nav" : ""} />
 
       {app.lessonModal && <LessonModal data={app.data} initial={app.lessonModal === "new" ? null : app.lessonModal} onClose={() => app.setLessonModal(null)} onSave={app.saveLesson} />}
       {app.studentModal && <StudentModal data={app.data} draft={app.studentDraft} setDraft={app.setStudentDraft} initial={app.studentModal === "new" ? null : app.studentModal} onClose={() => app.setStudentModal(null)} onSave={app.saveStudent} />}

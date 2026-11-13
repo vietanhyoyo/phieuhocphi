@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,6 +8,14 @@ export const metadata: Metadata = {
     icon: "/app-logo.png",
     apple: "/app-logo.png",
   },
+};
+
+// maximum-scale=1 stops iOS Safari/Chrome from auto-zooming when an input under 16px gets focus.
+// iOS still lets users pinch-zoom manually.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

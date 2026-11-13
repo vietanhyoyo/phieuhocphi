@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, LoaderCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ScrollToTopButton } from "@/components/shared/ScrollToTopButton";
 import { AppData, AuthUser, NoticeType, ReceiptTarget } from "@/lib/types";
 import { createReceiptPng, exportReceiptPng } from "@/lib/receipt-export";
 import { localReceiptPayment, ReceiptPayment } from "@/lib/receipt-payment";
@@ -16,6 +17,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, o
   const [isPreparingPng, setIsPreparingPng] = useState(true);
   const [receiptPng, setReceiptPng] = useState<Blob | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const screenRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef(onNotice);
   noticeRef.current = onNotice;
   const summary = getMonthlySummaryForMonths(data, target.months, target.studentId)[0];
@@ -104,7 +106,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, o
     }
   };
   if (!summary || !student) return null;
-  return <div className="receipt-screen">
+  return <div className="receipt-screen" ref={screenRef}>
     <div className="receipt-toolbar">
       <button className="icon-button" onClick={onClose} aria-label="Đóng phiếu học phí"><ArrowLeft size={20} /></button>
       <div><span className="eyebrow">XEM TRƯỚC</span><strong>Phiếu học phí</strong></div>
@@ -120,8 +122,7 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, o
       <div ref={receiptRef} className="receipt-card">
         <div className="receipt-top-decoration"><span /><span /><span /></div>
         <div className="receipt-heading-row">
-          <div className="receipt-brand"><span className="brand-mark brand-image"><img src="/app-logo.png" width={1254} height={1254} alt="Logo Sổ học phí" /></span><div><strong>SỔ HỌC PHÍ</strong><small>TRỢ LÝ GIA SƯ</small></div></div>
-          <div className="receipt-title"><span>PHIẾU HỌC PHÍ</span><h2>{monthSelectionLabel(target.months)}</h2>{target.months.length > 2 && <small className="receipt-period">{monthsLabel}</small>}</div>
+          <div className="receipt-title"><h2>{monthSelectionLabel(target.months)}</h2>{target.months.length > 2 && <small className="receipt-period">{monthsLabel}</small>}</div>
         </div>
         <div className="receipt-student"><div><span>HỌC SINH</span><strong>{student.name}</strong></div>{student.parentName && <small>Phụ huynh: {student.parentName}</small>}</div>
         <div className="receipt-lines">
@@ -129,7 +130,6 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, o
           {summary.subjects.map((subject) => <div className="receipt-line" key={subject.subjectId}><div><div className="receipt-subject-heading"><strong>{subject.subjectName}</strong><Badge variant="secondary" className="receipt-count-badge">{subject.lessonCount} buổi</Badge></div><small>{minutesLabel(subject.totalDurationMinutes)}</small></div><strong>{formatCurrency(subject.totalFee).replace(" ₫", "đ")}</strong></div>)}
         </div>
         <div className="receipt-total"><span>TỔNG CỘNG</span><strong>{formatCurrency(summary.totalFee).replace(" ₫", "đ")}</strong></div>
-        <div className={`receipt-payment-state ${allPaid ? "is-paid" : ""}`}><span>TRẠNG THÁI HỌC PHÍ</span><strong>{paymentStatus}</strong></div>
         <div className="receipt-dates"><span>NGÀY ĐÃ HỌC</span><div className="receipt-date-badges">{summary.lessonDates.map((date) => { const [year, month, day] = date.split("-"); return <Badge variant="secondary" key={date}>{day}/{month}{years.size > 1 ? `/${year}` : ""}</Badge>; })}</div></div>
         {payment && <div className="receipt-qr">
           <span className="receipt-qr-label">THANH TOÁN CHUYỂN KHOẢN</span>
@@ -139,5 +139,6 @@ export function ReceiptPreview({ data, currentUser, target, onClose, onNotice, o
         <div className="receipt-footer"><span>Cảm ơn bạn đã đồng hành cùng lớp học ✦</span><small>Được tạo từ Sổ học phí</small></div>
       </div>
     </div>
+    <ScrollToTopButton target={screenRef} className="is-without-nav" />
   </div>;
 }
