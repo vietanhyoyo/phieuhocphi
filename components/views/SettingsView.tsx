@@ -1,41 +1,139 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Cloud, Download, Edit3, FileJson, KeyRound, LogOut, Plus, Power, ShieldCheck, Sparkles, Upload, WifiOff } from "lucide-react";
+import { Fragment, useState, type ReactNode } from "react";
+import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Cloud, Download, KeyRound, Loader2, LogOut, Pencil, Plus, ShieldCheck, Upload, WifiOff } from "lucide-react";
 import { ChangePasswordModal } from "@/components/modals/ChangePasswordModal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/cn";
 import { AppData, AuthUser, Subject } from "@/lib/types";
 
-export function SettingsView({ data, storageStatus, currentUser, onLogout, onPasswordChanged, onBack, onAddSubject, onEditSubject, onToggleSubject, onBackup, onRestore }: { data: AppData; storageStatus: "checking" | "local" | "cloud" | "syncing" | "error"; currentUser: AuthUser | null; onLogout: () => void; onPasswordChanged: () => void; onBack: () => void; onAddSubject: () => void; onEditSubject: (subject: Subject) => void; onToggleSubject: (subject: Subject) => void; onBackup: () => void; onRestore: () => void }) {
+type StorageStatus = "checking" | "local" | "cloud" | "syncing" | "error";
+
+const STORAGE_META: Record<StorageStatus, { title: string; description: string; variant: "success" | "info" | "warning"; icon: typeof Cloud; spin?: boolean }> = {
+  cloud: { title: "Đã đồng bộ Google Sheet", description: "Dữ liệu được sao lưu trên Google Sheet, bản đệm vẫn giữ trên thiết bị.", variant: "success", icon: CheckCircle2 },
+  syncing: { title: "Đang đồng bộ Google Sheet…", description: "Các thay đổi đang được gửi lên Google Sheet.", variant: "info", icon: Loader2, spin: true },
+  checking: { title: "Đang kiểm tra nơi lưu trữ…", description: "Đang kết nối tới Google Sheet.", variant: "info", icon: Cloud },
+  error: { title: "Đang lưu tạm trên thiết bị", description: "Không kết nối được Google Sheet. Dữ liệu sẽ đồng bộ lại khi có mạng.", variant: "warning", icon: WifiOff },
+  local: { title: "Chỉ lưu trên thiết bị", description: "Chưa cấu hình Google Sheet, dữ liệu chỉ nằm trong trình duyệt này.", variant: "warning", icon: WifiOff },
+};
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <p className="m-0 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{children}</p>;
+}
+
+function ActionRow({ icon, iconClassName, title, description, onClick, destructive }: { icon: ReactNode; iconClassName: string; title: string; description?: string; onClick: () => void; destructive?: boolean }) {
+  return <button type="button" onClick={onClick} className="group flex w-full items-center gap-3 bg-transparent px-4 py-3 text-left transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none">
+    <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", iconClassName)}>{icon}</span>
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className={cn("text-sm font-medium", destructive ? "text-red-600" : "text-slate-800")}>{title}</span>
+      {description && <span className="text-xs text-slate-500">{description}</span>}
+    </span>
+    {!destructive && <ChevronRight className="size-4 text-slate-300 transition-transform group-hover:translate-x-0.5" />}
+  </button>;
+}
+
+export function SettingsView({ data, storageStatus, currentUser, onLogout, onPasswordChanged, onBack, onAddSubject, onEditSubject, onToggleSubject, onBackup, onRestore }: { data: AppData; storageStatus: StorageStatus; currentUser: AuthUser | null; onLogout: () => void; onPasswordChanged: () => void; onBack: () => void; onAddSubject: () => void; onEditSubject: (subject: Subject) => void; onToggleSubject: (subject: Subject) => void; onBackup: () => void; onRestore: () => void }) {
   const [changingPassword, setChangingPassword] = useState(false);
-  const storageLabel = storageStatus === "cloud" ? "Đã đồng bộ Google Sheet" : storageStatus === "syncing" ? "Đang đồng bộ Google Sheet…" : storageStatus === "error" ? "Đang lưu tạm trên thiết bị" : storageStatus === "checking" ? "Đang kiểm tra nơi lưu trữ…" : "Chỉ lưu trên thiết bị";
-  const StorageIcon = storageStatus === "local" || storageStatus === "error" ? WifiOff : storageStatus === "cloud" ? CheckCircle2 : Cloud;
+  const storage = STORAGE_META[storageStatus];
+  const StorageIcon = storage.icon;
+  const activeCount = data.subjects.filter((subject) => subject.active).length;
 
-  return <div className="view-stack settings-view">
-    <div className="settings-intro"><span className="settings-badge"><ShieldCheck size={17} /> Dữ liệu riêng tư</span><h2>Cài đặt sổ học phí</h2><p>Thông tin học sinh, học phí và buổi dạy được đồng bộ lên Google Sheet khi đã cấu hình kết nối.</p></div>
-    <section className="settings-section"><div className="storage-status"><StorageIcon size={17} /><span><strong>{storageLabel}</strong><small>localStorage vẫn giữ bản đệm để dùng khi mất mạng.</small></span></div></section>
+  return <div className="flex flex-col gap-6 pb-2 pt-2">
+    <header className="flex items-center justify-between gap-3 px-1">
+      <p className="m-0 text-sm text-slate-500">Quản lý tài khoản, môn học và dữ liệu.</p>
+      <Badge variant="success" className="shrink-0 gap-1 px-2 py-1"><ShieldCheck className="size-3.5" /> Riêng tư</Badge>
+    </header>
 
-    <section className="settings-section">
-      <div className="section-heading"><div><span className="section-kicker">DANH MỤC</span><h3>Môn học</h3></div><button className="text-button" onClick={onAddSubject}><Plus size={15} /> Thêm môn</button></div>
-      <div className="settings-list">{data.subjects.map((subject) => <div className="settings-row" key={subject.id}><span className={`subject-status ${subject.active ? "on" : "off"}`}><BookOpen size={16} /></span><div><strong>{subject.name}</strong><span>{subject.active ? "Đang hoạt động" : "Đã tạm ngưng"}</span></div><div className="row-actions always"><button onClick={() => onEditSubject(subject)} aria-label="Đổi tên môn"><Edit3 size={15} /></button><button onClick={() => onToggleSubject(subject)} aria-label={subject.active ? "Tạm ngưng môn" : "Bật môn"}><Power size={15} /></button></div></div>)}</div>
-      <p className="section-hint"><ShieldCheck size={14} /> Môn đã có trong lịch sử sẽ được tạm ngưng thay vì xóa.</p>
-    </section>
-
-    <section className="settings-section">
-      <div className="section-heading"><div><span className="section-kicker">DỮ LIỆU</span><h3>Backup & restore</h3></div><span className="heading-icon green-tint"><FileJson size={19} /></span></div>
-      <div className="data-actions">
-        <button onClick={onBackup}><span className="data-action-icon blue"><Download size={18} /></span><span><strong>Xuất bản sao lưu</strong><small>Tải toàn bộ dữ liệu thành file JSON</small></span><ChevronRight size={17} /></button>
-        <button onClick={onRestore}><span className="data-action-icon green"><Upload size={18} /></span><span><strong>Khôi phục dữ liệu</strong><small>Nhập lại từ file backup đã lưu</small></span><ChevronRight size={17} /></button>
-      </div>
-      <div className="data-warning"><AlertTriangle size={16} /><span>Backup định kỳ giúp bạn không mất dữ liệu khi đổi thiết bị hoặc xóa trình duyệt.</span></div>
-    </section>
-
-    {currentUser && <section className="settings-section">
-      <div className="section-heading"><div><span className="section-kicker">TÀI KHOẢN</span><h3>{currentUser.username}</h3></div><button className="text-button danger-text" onClick={onLogout}><LogOut size={15} /> Đăng xuất</button></div>
-      <button className="settings-row settings-password-button" onClick={() => setChangingPassword(true)}><span className="config-icon"><KeyRound size={16} /></span><div><strong>Đổi mật khẩu</strong><span>Cập nhật mật khẩu đăng nhập</span></div><ChevronRight size={17} /></button>
+    {currentUser && <section className="flex flex-col gap-2">
+      <SectionLabel>Tài khoản</SectionLabel>
+      <Card className="overflow-hidden">
+        <div className="flex items-center gap-3 p-4">
+          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-base font-semibold uppercase text-white shadow-sm">{currentUser.username.slice(0, 1)}</span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-[15px] font-semibold text-slate-900">{currentUser.username}</span>
+            <span className="text-xs text-slate-500">Đang đăng nhập</span>
+          </div>
+        </div>
+        <Separator />
+        <ActionRow icon={<KeyRound className="size-4" />} iconClassName="bg-indigo-50 text-indigo-600" title="Đổi mật khẩu" description="Cập nhật mật khẩu đăng nhập" onClick={() => setChangingPassword(true)} />
+        <Separator />
+        <ActionRow icon={<LogOut className="size-4" />} iconClassName="bg-red-50 text-red-500" title="Đăng xuất" onClick={onLogout} destructive />
+      </Card>
     </section>}
 
-    <section className="about-card"><div className="brand-mark brand-image small"><img src="/app-logo.png" alt="Logo Sổ học phí" /></div><div><strong>Sổ học phí</strong><span>Google Sheet + bản đệm offline</span></div><Sparkles size={17} /></section>
-    <button className="back-link centered" onClick={onBack}><ArrowLeft size={16} /> Về trang chủ</button>
+    <section className="flex flex-col gap-2">
+      <SectionLabel>Lưu trữ</SectionLabel>
+      <Alert variant={storage.variant}>
+        <StorageIcon className={cn(storage.spin && "animate-spin")} />
+        <div className="flex flex-col gap-1">
+          <AlertTitle className="m-0">{storage.title}</AlertTitle>
+          <AlertDescription>{storage.description}</AlertDescription>
+        </div>
+      </Alert>
+    </section>
+
+    <section className="flex flex-col gap-2">
+      <SectionLabel>Danh mục</SectionLabel>
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 p-4">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>Môn học</CardTitle>
+            <CardDescription>{activeCount}/{data.subjects.length} môn đang hoạt động</CardDescription>
+          </div>
+          <Button size="sm" variant="secondary" className="h-8 rounded-lg px-3 text-xs" onClick={onAddSubject}><Plus className="size-4" /> Thêm môn</Button>
+        </CardHeader>
+        <Separator />
+        {data.subjects.length === 0
+          ? <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+            <BookOpen className="size-6 text-slate-300" />
+            <span className="text-sm text-slate-500">Chưa có môn học nào</span>
+          </div>
+          : <ul className="m-0 list-none p-0">{data.subjects.map((subject, index) => <Fragment key={subject.id}>
+            {index > 0 && <Separator className="ml-16 w-auto" />}
+            <li className="flex items-center gap-3 px-4 py-3">
+              <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", subject.active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400")}><BookOpen className="size-4" /></span>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className={cn("truncate text-sm font-medium", subject.active ? "text-slate-800" : "text-slate-400 line-through decoration-slate-300")}>{subject.name}</span>
+                <span className="text-xs text-slate-500">{subject.active ? "Đang hoạt động" : "Đã tạm ngưng"}</span>
+              </div>
+              <Button size="icon-sm" variant="ghost" className="text-slate-500" onClick={() => onEditSubject(subject)} aria-label={`Đổi tên môn ${subject.name}`}><Pencil className="size-4" /></Button>
+              <Switch checked={subject.active} onCheckedChange={() => onToggleSubject(subject)} aria-label={subject.active ? `Tạm ngưng môn ${subject.name}` : `Bật môn ${subject.name}`} />
+            </li>
+          </Fragment>)}</ul>}
+        <Separator />
+        <p className="m-0 flex items-center gap-1.5 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-500"><ShieldCheck className="size-3.5 shrink-0" /> Môn đã có trong lịch sử sẽ được tạm ngưng thay vì xóa.</p>
+      </Card>
+    </section>
+
+    <section className="flex flex-col gap-2">
+      <SectionLabel>Dữ liệu</SectionLabel>
+      <Card className="overflow-hidden">
+        <ActionRow icon={<Download className="size-4" />} iconClassName="bg-sky-50 text-sky-600" title="Xuất bản sao lưu" description="Tải toàn bộ dữ liệu thành file JSON" onClick={onBackup} />
+        <Separator className="ml-16 w-auto" />
+        <ActionRow icon={<Upload className="size-4" />} iconClassName="bg-emerald-50 text-emerald-600" title="Khôi phục dữ liệu" description="Nhập lại từ file backup đã lưu" onClick={onRestore} />
+      </Card>
+      <Alert variant="warning" className="py-2.5">
+        <AlertTriangle />
+        <AlertDescription className="opacity-100">Backup định kỳ giúp bạn không mất dữ liệu khi đổi thiết bị hoặc xóa trình duyệt.</AlertDescription>
+      </Alert>
+    </section>
+
+    <Card className="bg-slate-50/60 shadow-none">
+      <CardContent className="flex items-center gap-3 p-4">
+        <span className="size-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm"><img src="/app-logo.png" alt="Logo Sổ học phí" className="size-full object-contain" /></span>
+        <div className="flex flex-1 flex-col gap-0.5">
+          <span className="text-sm font-semibold text-slate-800">Sổ học phí</span>
+          <span className="text-xs text-slate-500">Google Sheet + bản đệm offline</span>
+        </div>
+      </CardContent>
+    </Card>
+
+    <Button variant="ghost" className="mx-auto text-slate-500" onClick={onBack}><ArrowLeft className="size-4" /> Về trang chủ</Button>
     {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} onPasswordChanged={onPasswordChanged} />}
   </div>;
 }

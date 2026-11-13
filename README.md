@@ -24,7 +24,11 @@ Mở [http://localhost:3000](http://localhost:3000).
 
 Khi cập nhật `Code.gs`, hãy triển khai phiên bản Web App mới để các thay đổi đồng bộ, gồm trạng thái đã thu học phí của buổi dạy, hoạt động với mã mới. Lần ghi dữ liệu tiếp theo sẽ tự thêm cột `paid` vào cuối bảng `App_Lessons`; các buổi cũ mặc định là chưa thu tiền.
 
-Xem hướng dẫn chi tiết tại [`docs/google-sheets-setup-vi.md`](./docs/google-sheets-setup-vi.md).
+Tài liệu:
+
+- [`docs/kien-truc.md`](./docs/kien-truc.md) — kiến trúc mã nguồn.
+- [`docs/luu-du-lieu-google-sheet.md`](./docs/luu-du-lieu-google-sheet.md) — cơ chế lưu và đồng bộ dữ liệu với Google Sheet, cách cài đặt.
+- [`docs/test-tai-khoan-vietanh.md`](./docs/test-tai-khoan-vietanh.md) — test bằng tài khoản `vietanh`.
 
 ## Chức năng chính
 

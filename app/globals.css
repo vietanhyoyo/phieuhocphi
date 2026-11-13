@@ -240,8 +240,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .profile-actions .primary-button { color: #176d8f; background: #fff; box-shadow: none; }
 .profile-actions .ghost-button { color: rgba(255,255,255,.82); background: rgba(255,255,255,.13); }
 .config-list { display: flex; flex-direction: column; gap: 7px; }
-.config-row, .settings-row { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
-.config-icon, .subject-status { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; color: #378fab; border-radius: 10px; background: #eaf6fa; }
+.config-row { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.config-icon { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; color: #378fab; border-radius: 10px; background: #eaf6fa; }
 .config-row > div { display: flex; flex-direction: column; gap: 3px; }
 .config-row strong { color: #38576a; font-size: 11px; }
 .config-row span { color: #8a9ca7; font-size: 9px; }
@@ -292,37 +292,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .tuition-card-bottom > div > strong { color: #3730a3; font-family: 'Roboto', sans-serif; font-size: 16px; }
 .tuition-paid-note { color: #047857; font-size: 9px; font-weight: 700; }
 .receipt-button { min-height: 30px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; color: #2d829c; border-radius: 9px; background: #eef8fa; font-size: 10px; font-weight: 800; }
-.settings-view { gap: 26px; }
-.settings-intro { padding: 8px 3px 0; }
 .settings-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; color: #4f9d7e; border-radius: 7px; background: #eaf7f1; font-size: 9px; font-weight: 800; }
-.settings-intro h2 { margin: 11px 0 6px; font-family: 'Roboto', sans-serif; font-size: 25px; letter-spacing: -.06em; }
-.settings-intro p { max-width: 340px; margin: 0; color: #8498a2; font-size: 11px; line-height: 1.55; }
-.settings-section { display: flex; flex-direction: column; gap: 12px; }
-.settings-list { display: flex; flex-direction: column; gap: 8px; }
-.settings-row { min-height: 53px; }
-.settings-password-button { width: 100%; text-align: left; cursor: pointer; }
-.settings-row > div:not(.row-actions) { display: flex; flex: 1; flex-direction: column; gap: 3px; }
-.settings-row strong { color: #3a596a; font-size: 11px; }
-.settings-row div > span { color: #91a1a9; font-size: 9px; }
-.subject-status.on { color: #3f9a7d; background: #e7f7ef; }
-.subject-status.off { color: #9aa5aa; background: #f0f3f4; }
-.row-actions.always { margin-left: auto; }
-.section-hint { display: flex; align-items: center; gap: 5px; margin: 0; color: #9caab1; font-size: 9px; line-height: 1.45; }
-.data-actions { display: flex; flex-direction: column; gap: 8px; }
-.data-actions > button { display: flex; align-items: center; gap: 10px; padding: 10px; text-align: left; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
-.data-actions > button > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 3px; }
-.data-actions strong { color: #3b5969; font-size: 11px; }
-.data-actions small { color: #9ba9af; font-size: 9px; }
-.data-actions > button > svg { color: #a0b0b6; }
-.data-action-icon { width: 33px; height: 33px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; }
-.data-action-icon.blue { color: #338daf; background: #eaf6fb; }
-.data-action-icon.green { color: #4c9b7e; background: #e8f7ef; }
-.data-warning { display: flex; align-items: flex-start; gap: 6px; padding: 10px; color: #a1824f; border-radius: 11px; background: #fff8e9; font-size: 9px; line-height: 1.45; }
-.about-card { display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid var(--line); border-radius: 15px; background: #fbfcfd; }
-.about-card > div:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 3px; }
-.about-card strong { color: #496576; font-size: 11px; }
-.about-card span { color: #9aa8ae; font-size: 9px; }
-.about-card > svg { color: #67b49a; }
 .centered { margin: 0 auto; }
 .bottom-nav { position: fixed; z-index: 10; bottom: 0; left: 50%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: min(100%, 430px); min-height: calc(68px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 10px calc(20px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #e8edf3; border-radius: 22px 22px 0 0; background: #fff; box-shadow: 0 -4px 18px rgba(15, 23, 42, .07); }
 .nav-item { min-width: 0; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #525965; border-radius: 12px; background: transparent; font-size: 10px; font-weight: 500; line-height: 1.4; transition: color .18s ease; }
@@ -376,11 +346,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 .loading-mark { width: 46px; height: 46px; display: grid; place-items: center; color: #fff; border-radius: 15px; background: var(--primary); box-shadow: 0 8px 18px rgba(25, 129, 171, .2); }
 .loading-mark.brand-image { overflow: hidden; padding: 0; background: #fff; }
 
-.storage-status { display: flex; align-items: center; gap: 9px; padding: 11px 12px; color: #28758b; border: 1px solid #d9edf1; border-radius: 13px; background: #f5fcfd; }
-.storage-status > svg { flex: 0 0 auto; }
-.storage-status span { display: flex; flex-direction: column; gap: 3px; }
-.storage-status strong { font-size: 10px; }
-.storage-status small { color: #7c9ba5; font-size: 9px; }
 .danger-text { color: #bd6262 !important; }
 .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 22px; background: linear-gradient(180deg, #f7fbfc 0%, #eef5f7 100%); }
 .auth-card { width: min(100%, 390px); padding: 29px 23px 23px; border: 1px solid #e2e8f0; border-radius: 26px; background: #fff; box-shadow: 0 18px 48px rgba(35, 83, 100, .12); }
@@ -476,7 +441,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary) !import
 /* Shadcn surface pass */
 .app-content { background: linear-gradient(180deg, #fff 0%, #fafbff 100%); }
 .app-header { border-bottom: 1px solid rgba(226, 232, 240, .8); }
-.stat-card, .lesson-row, .student-card, .tuition-card, .settings-row, .config-row { border-color: #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(79, 70, 229, .035); }
+.stat-card, .lesson-row, .student-card, .tuition-card, .config-row { border-color: #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(79, 70, 229, .035); }
 .student-card:hover, .lesson-row:hover { border-color: #c7d2fe; box-shadow: 0 10px 28px rgba(79, 70, 229, .08); }
 .search-wrap, .filter-panel { border-color: #e2e8f0; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .03); }
 .empty-card { border-color: #dbe3f0; background: linear-gradient(180deg, #fff, #f8fafc); }
