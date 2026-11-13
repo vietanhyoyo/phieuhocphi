@@ -11,10 +11,34 @@ const METADATA_TTL_MS = 5 * 60 * 1000;
 export type SheetProperties = { sheetId: number; title: string; rowCount: number; columnCount: number };
 export type SpreadsheetInfo = { timeZone: string; sheets: Record<string, SheetProperties> };
 
+const unquote = (value: string) => {
+  const text = value.trim();
+  return text.length > 1 && (text[0] === '"' || text[0] === "'") && text.at(-1) === text[0] ? text.slice(1, -1).trim() : text;
+};
+
+// Hosting dashboards mangle multi-line secrets in many ways: wrapping
+// quotes, literal "\n", real or Windows line breaks, newlines turned into
+// spaces, base64, or the whole JSON key file. Rebuild a clean PEM from any.
+export function normalizePrivateKey(raw: string) {
+  let key = unquote(raw);
+  if (key.startsWith("{")) {
+    try { key = String((JSON.parse(key) as { private_key?: unknown }).private_key ?? ""); } catch { /* not JSON */ }
+  }
+  if (!key.includes("-----BEGIN")) {
+    const decoded = Buffer.from(key, "base64").toString("utf8");
+    if (decoded.includes("-----BEGIN")) key = decoded;
+  }
+  key = key.replace(/\\r/g, "").replace(/\\n/g, "\n");
+  const match = /-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/.exec(key);
+  if (!match) return key.trim();
+  const body = match[2].replace(/[^A-Za-z0-9+/=]/g, "");
+  return `-----BEGIN ${match[1]}-----\n${body.match(/.{1,64}/g)?.join("\n") ?? ""}\n-----END ${match[1]}-----\n`;
+}
+
 export function serviceAccountConfig() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
-  // .env files usually hold the PEM on one line with literal "\n".
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
+  const email = unquote(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "");
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? "";
+  const key = raw.trim() ? normalizePrivateKey(raw) : "";
   return email && key ? { email, key } : null;
 }
 
@@ -26,7 +50,12 @@ async function fetchToken() {
   const now = Math.floor(Date.now() / 1000);
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const unsigned = `${encode({ alg: "RS256", typ: "JWT" })}.${encode({ iss: config.email, scope: SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 })}`;
-  const signature = createSign("RSA-SHA256").update(unsigned).sign(config.key, "base64url");
+  let signature: string;
+  try {
+    signature = createSign("RSA-SHA256").update(unsigned).sign(config.key, "base64url");
+  } catch {
+    throw new Error("Không đọc được GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY. Hãy dán lại giá trị private_key trong file JSON của service account.");
+  }
   const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
