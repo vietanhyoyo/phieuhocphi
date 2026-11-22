@@ -3,6 +3,7 @@
 // backend can read what the other wrote.
 
 import { ChangeSet, Collection, parseChangeSet } from "./change-set";
+import { getReceiptPayment } from "./receipt-payment";
 
 export type TableDef = { name: string; headers: string[] };
 export type SheetRecord = Record<string, unknown>;
@@ -289,9 +290,8 @@ async function applyChanges(backend: SheetsBackend, userId: string, changes: Cha
 }
 
 export function bankAccountForUsername(username: unknown) {
-  return String(username ?? "").trim().toLowerCase() === "khadang2004cm@gmail.com"
-    ? { bankName: "MB BANK", bankAccountName: "DANG VU KHA", bankAccountNumber: "20402023979", bankQrImage: "/dang-vu-kha-qr.png" }
-    : { bankName: "TECHCOMBANK", bankAccountName: "DANH MINH HIEU", bankAccountNumber: "8804040202", bankQrImage: "/danh-minh-hieu-qr.png" };
+  const payment = getReceiptPayment({ username });
+  return { bankName: payment.bank, bankAccountName: payment.accountName, bankAccountNumber: payment.accountNumber.replace(/\s/g, ""), bankQrImage: payment.qrSrc };
 }
 
 async function createUser(backend: SheetsBackend, input: unknown) {

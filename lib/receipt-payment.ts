@@ -19,9 +19,19 @@ const khaReceiptPayment: ReceiptPayment = {
   accountNumber: "20402023979",
 };
 
-/** The designated email is the only account that receives Kha's payment details. */
+const trungReceiptPayment: ReceiptPayment = {
+  qrSrc: "/tran-quoc-trung-qr.jpg",
+  bank: "VIETCOMBANK",
+  accountName: "TRAN QUOC TRUNG",
+  accountNumber: "1032705912",
+};
+
+/** Accounts with their own payment details; everyone else uses the default. */
+const paymentsByUsername: Record<string, ReceiptPayment> = {
+  "khadang2004cm@gmail.com": khaReceiptPayment,
+  "quốc trung": trungReceiptPayment,
+};
+
 export function getReceiptPayment(record: Record<string, unknown>): ReceiptPayment {
-  return String(record.username ?? "").trim().toLowerCase() === "khadang2004cm@gmail.com"
-    ? khaReceiptPayment
-    : localReceiptPayment;
+  return paymentsByUsername[String(record.username ?? "").trim().toLowerCase().normalize("NFC")] ?? localReceiptPayment;
 }

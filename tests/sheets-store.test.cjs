@@ -14,7 +14,8 @@ function load(file, imports = {}) {
 }
 
 const changeSet = load('lib/change-set.ts');
-const store = load('lib/sheets-store.ts', { './change-set': changeSet });
+const receiptPayment = load('lib/receipt-payment.ts');
+const store = load('lib/sheets-store.ts', { './change-set': changeSet, './receipt-payment': receiptPayment });
 const { TABLES } = store;
 
 // In-memory spreadsheet: tab name → raw rows (header included).
